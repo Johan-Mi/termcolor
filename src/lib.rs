@@ -132,7 +132,7 @@ pub trait WriteColor: io::Write {
     ///
     /// Note that this does not reset hyperlinks. Those need to be
     /// reset on their own, e.g., by calling `set_hyperlink` with
-    /// [`HyperlinkSpec::none`].
+    /// [`HyperlinkSpec::close`].
     fn reset(&mut self) -> io::Result<()>;
 
     /// Returns true if and only if the underlying writer must synchronously
