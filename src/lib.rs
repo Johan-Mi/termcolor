@@ -298,42 +298,15 @@ impl ColorChoice {
         }
     }
 
-    #[cfg(not(windows))]
     fn env_allows_color(&self) -> bool {
-        match env::var_os("TERM") {
-            // If TERM isn't set, then we are in a weird environment that
-            // probably doesn't support colors.
-            None => return false,
-            Some(k) => {
-                if k == "dumb" {
-                    return false;
-                }
-            }
-        }
-        // If TERM != dumb, then the only way we don't allow colors at this
-        // point is if NO_COLOR is set.
-        if env::var_os("NO_COLOR").is_some() {
-            return false;
-        }
-        true
-    }
-
-    #[cfg(windows)]
-    fn env_allows_color(&self) -> bool {
-        // On Windows, if TERM isn't set, then we shouldn't automatically
-        // assume that colors aren't allowed. This is unlike Unix environments
-        // where TERM is more rigorously set.
-        if let Some(k) = env::var_os("TERM") {
-            if k == "dumb" {
-                return false;
-            }
-        }
-        // If TERM != dumb, then the only way we don't allow colors at this
-        // point is if NO_COLOR is set.
-        if env::var_os("NO_COLOR").is_some() {
-            return false;
-        }
-        true
+        env::var_os("NO_COLOR").is_none_or(|it| it.is_empty() || it == "0")
+            && (env::var_os("CLICOLOR_FORCE")
+                .is_some_and(|it| !(it.is_empty() || it == "0"))
+                || (env::var_os("CLICOLOR").is_none_or(|it| it != "0")
+                    // If TERM isn't set, then we are in a weird environment that
+                    // probably doesn't support colors, or Windows.
+                    && env::var_os("TERM")
+                        .map_or(cfg!(windows), |it| it != "dumb")))
     }
 
     /// Returns true if this choice should forcefully use ANSI color codes.
