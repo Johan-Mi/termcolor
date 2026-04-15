@@ -227,22 +227,16 @@ impl<T: ?Sized + WriteColor> WriteColor for Box<T> {
 /// The `FromStr` implementation for this type converts a lowercase kebab-case
 /// string of the variant name to the corresponding variant. Any other string
 /// results in an error.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ColorChoice {
     /// Try very hard to emit colors.
     Always,
     /// Try to use colors, but don't force the issue. If `TERM=dumb`, or if
     /// `NO_COLOR` is defined, for example, then don't use colors.
+    #[default]
     Auto,
     /// Never emit colors.
     Never,
-}
-
-/// The default is `Auto`.
-impl Default for ColorChoice {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl FromStr for ColorChoice {
