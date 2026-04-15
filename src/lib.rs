@@ -239,7 +239,7 @@ impl<T: ?Sized + WriteColor> WriteColor for Box<T> {
     }
 }
 
-/// ColorChoice represents the color preferences of an end user.
+/// `ColorChoice` represents the color preferences of an end user.
 ///
 /// The `Default` implementation for this type will select `Auto`, which tries
 /// to do the right thing based on the current environment.
@@ -252,11 +252,11 @@ pub enum ColorChoice {
     /// Try very hard to emit colors. This includes emitting ANSI colors
     /// on Windows if the console API is unavailable.
     Always,
-    /// AlwaysAnsi is like Always, except it never tries to use anything other
-    /// than emitting ANSI color codes.
+    /// `AlwaysAnsi` is like `Always`, except it never tries to use anything
+    /// other than emitting ANSI color codes.
     AlwaysAnsi,
     /// Try to use colors, but don't force the issue. If the console isn't
-    /// available on Windows, or if TERM=dumb, or if `NO_COLOR` is defined, for
+    /// available on Windows, or if `TERM=dumb`, or if `NO_COLOR` is defined, for
     /// example, then don't use colors.
     Auto,
     /// Never emit colors.
@@ -288,16 +288,15 @@ impl FromStr for ColorChoice {
 
 impl ColorChoice {
     /// Returns true if we should attempt to write colored output.
-    fn should_attempt_color(&self) -> bool {
-        match *self {
-            Self::Always => true,
-            Self::AlwaysAnsi => true,
+    fn should_attempt_color(self) -> bool {
+        match self {
+            Self::Always | Self::AlwaysAnsi => true,
             Self::Never => false,
-            Self::Auto => self.env_allows_color(),
+            Self::Auto => Self::env_allows_color(),
         }
     }
 
-    fn env_allows_color(&self) -> bool {
+    fn env_allows_color() -> bool {
         env::var_os("NO_COLOR").is_none_or(|it| it.is_empty() || it == "0")
             && (env::var_os("CLICOLOR_FORCE")
                 .is_some_and(|it| !(it.is_empty() || it == "0"))
@@ -354,6 +353,7 @@ impl fmt::Display for ColorChoiceParseError {
 // separate types, which makes it difficult to abstract over them. We use
 // some simple internal enum types to work around this.
 
+#[derive(Clone, Copy)]
 enum StandardStreamType {
     Stdout,
     Stderr,
@@ -399,7 +399,7 @@ impl IoStandardStream {
 }
 
 impl io::Write for IoStandardStream {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         match *self {
             Self::Stdout(ref mut s) => s.write(b),
@@ -409,7 +409,7 @@ impl io::Write for IoStandardStream {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         match *self {
             Self::Stdout(ref mut s) => s.flush(),
@@ -428,8 +428,8 @@ enum IoStandardStreamLock<'a> {
     StderrLock(io::StderrLock<'a>),
 }
 
-impl<'a> io::Write for IoStandardStreamLock<'a> {
-    #[inline(always)]
+impl io::Write for IoStandardStreamLock<'_> {
+    #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         match *self {
             IoStandardStreamLock::StdoutLock(ref mut s) => s.write(b),
@@ -437,7 +437,7 @@ impl<'a> io::Write for IoStandardStreamLock<'a> {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         match *self {
             IoStandardStreamLock::StdoutLock(ref mut s) => s.flush(),
@@ -471,7 +471,7 @@ pub struct BufferedStandardStream {
     wtr: LossyStandardStream<WriterInner<IoStandardStream>>,
 }
 
-/// WriterInner is a (limited) generic representation of a writer. It is
+/// `WriterInner` is a (limited) generic representation of a writer. It is
 /// limited because W should only ever be stdout/stderr on Windows.
 #[derive(Debug)]
 enum WriterInner<W> {
@@ -484,7 +484,7 @@ enum WriterInner<W> {
     },
 }
 
-/// WriterInnerLock is a (limited) generic representation of a writer. It is
+/// `WriterInnerLock` is a (limited) generic representation of a writer. It is
 /// limited because W should only ever be stdout/stderr on Windows.
 #[derive(Debug)]
 enum WriterInnerLock<'a, W> {
@@ -493,7 +493,7 @@ enum WriterInnerLock<'a, W> {
     /// What a gross hack. On Windows, we need to specify a lifetime for the
     /// console when in a locked state, but obviously don't need to do that
     /// on Unix, which makes the `'a` unused. To satisfy the compiler, we need
-    /// a PhantomData.
+    /// a `PhantomData`.
     #[allow(dead_code)]
     Unreachable(::std::marker::PhantomData<&'a ()>),
     #[cfg(windows)]
@@ -542,7 +542,7 @@ impl StandardStream {
     }
 }
 
-impl<'a> StandardStreamLock<'a> {
+impl StandardStreamLock<'_> {
     #[cfg(not(windows))]
     fn from_stream(stream: &StandardStream) -> StandardStreamLock<'_> {
         let locked = match *stream.wtr.get_ref() {
@@ -700,7 +700,7 @@ impl WriteColor for StandardStream {
     }
 }
 
-impl<'a> io::Write for StandardStreamLock<'a> {
+impl io::Write for StandardStreamLock<'_> {
     #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         self.wtr.write(b)
@@ -712,7 +712,7 @@ impl<'a> io::Write for StandardStreamLock<'a> {
     }
 }
 
-impl<'a> WriteColor for StandardStreamLock<'a> {
+impl WriteColor for StandardStreamLock<'_> {
     #[inline]
     fn supports_color(&self) -> bool {
         self.wtr.supports_color()
@@ -795,7 +795,7 @@ impl WriteColor for BufferedStandardStream {
 }
 
 impl<W: io::Write> io::Write for WriterInner<W> {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match *self {
             Self::NoColor(ref mut wtr) => wtr.write(buf),
@@ -805,7 +805,7 @@ impl<W: io::Write> io::Write for WriterInner<W> {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         match *self {
             Self::NoColor(ref mut wtr) => wtr.flush(),
@@ -880,7 +880,7 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
     }
 }
 
-impl<'a, W: io::Write> io::Write for WriterInnerLock<'a, W> {
+impl<W: io::Write> io::Write for WriterInnerLock<'_, W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match *self {
             WriterInnerLock::Unreachable(_) => unreachable!(),
@@ -902,7 +902,7 @@ impl<'a, W: io::Write> io::Write for WriterInnerLock<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> WriteColor for WriterInnerLock<'a, W> {
+impl<W: io::Write> WriteColor for WriterInnerLock<'_, W> {
     fn supports_color(&self) -> bool {
         match *self {
             WriterInnerLock::Unreachable(_) => unreachable!(),
@@ -1142,7 +1142,7 @@ impl BufferWriter {
 #[derive(Clone, Debug)]
 pub struct Buffer(BufferInner);
 
-/// BufferInner is an enumeration of different buffer types.
+/// `BufferInner` is an enumeration of different buffer types.
 #[derive(Clone, Debug)]
 enum BufferInner {
     /// No coloring information should be applied. This ignores all coloring
@@ -1494,10 +1494,10 @@ impl<W: io::Write> WriteColor for Ansi<W> {
         if spec.strikethrough {
             self.write_str("\x1B[9m")?;
         }
-        if let Some(ref c) = spec.fg_color {
+        if let Some(c) = spec.fg_color {
             self.write_color(true, c, spec.intense)?;
         }
-        if let Some(ref c) = spec.bg_color {
+        if let Some(c) = spec.bg_color {
             self.write_color(false, c, spec.intense)?;
         }
         Ok(())
@@ -1531,7 +1531,7 @@ impl<W: io::Write> Ansi<W> {
     fn write_color(
         &mut self,
         fg: bool,
-        c: &Color,
+        c: Color,
         intense: bool,
     ) -> io::Result<()> {
         macro_rules! write_intense {
@@ -1607,7 +1607,7 @@ impl<W: io::Write> Ansi<W> {
             }};
         }
         if intense {
-            match *c {
+            match c {
                 Color::Black => write_intense!("8"),
                 Color::Blue => write_intense!("12"),
                 Color::Green => write_intense!("10"),
@@ -1620,7 +1620,7 @@ impl<W: io::Write> Ansi<W> {
                 Color::Rgb(r, g, b) => write_custom!(r, g, b),
             }
         } else {
-            match *c {
+            match c {
                 Color::Black => write_normal!("0"),
                 Color::Blue => write_normal!("4"),
                 Color::Green => write_normal!("2"),
@@ -2091,11 +2091,9 @@ impl Color {
         // by a comma corresponding to one of 256^3 colors.
 
         fn parse_number(s: &str) -> Option<u8> {
-            if let Some(s) = s.strip_prefix("0x") {
-                u8::from_str_radix(s, 16).ok()
-            } else {
-                s.parse::<u8>().ok()
-            }
+            s.strip_prefix("0x")
+                .map_or_else(|| s.parse::<u8>(), |s| u8::from_str_radix(s, 16))
+                .ok()
         }
 
         let codes: Vec<&str> = s.split(',').collect();
@@ -2124,7 +2122,7 @@ impl Color {
             }
             Ok(Self::Rgb(v[0], v[1], v[2]))
         } else {
-            Err(if s.contains(",") {
+            Err(if s.contains(',') {
                 ParseColorError {
                     kind: ParseColorErrorKind::InvalidRgb,
                     given: s.to_string(),
@@ -2162,33 +2160,33 @@ impl ParseColorError {
 
 impl error::Error for ParseColorError {
     fn description(&self) -> &str {
-        use self::ParseColorErrorKind::*;
         match self.kind {
-            InvalidName => "unrecognized color name",
-            InvalidAnsi256 => "invalid ansi256 color number",
-            InvalidRgb => "invalid RGB color triple",
+            ParseColorErrorKind::InvalidName => "unrecognized color name",
+            ParseColorErrorKind::InvalidAnsi256 => {
+                "invalid ansi256 color number"
+            }
+            ParseColorErrorKind::InvalidRgb => "invalid RGB color triple",
         }
     }
 }
 
 impl fmt::Display for ParseColorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::ParseColorErrorKind::*;
         match self.kind {
-            InvalidName => write!(
+            ParseColorErrorKind::InvalidName => write!(
                 f,
                 "unrecognized color name '{}'. Choose from: \
                  black, blue, green, red, cyan, magenta, yellow, \
                  white",
                 self.given
             ),
-            InvalidAnsi256 => write!(
+            ParseColorErrorKind::InvalidAnsi256 => write!(
                 f,
                 "unrecognized ansi256 color number, \
                  should be '[0-255]' (or a hex number), but is '{}'",
                 self.given
             ),
-            InvalidRgb => write!(
+            ParseColorErrorKind::InvalidRgb => write!(
                 f,
                 "unrecognized RGB color triple, \
                  should be '[0-255],[0-255],[0-255]' (or a hex \
@@ -2262,6 +2260,7 @@ impl<W: io::Write> LossyStandardStream<W> {
 
     #[cfg(not(windows))]
     const fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
+        _ = self;
         LossyStandardStream::new(wtr)
     }
 
@@ -2423,7 +2422,7 @@ mod tests {
     #[test]
     fn test_var_ansi_write_rgb() {
         let mut buf = Ansi::new(vec![]);
-        let _ = buf.write_color(true, &Color::Rgb(254, 253, 255), false);
+        let _ = buf.write_color(true, Color::Rgb(254, 253, 255), false);
         assert_eq!(buf.0, b"\x1B[38;2;254;253;255m");
     }
 
@@ -2448,11 +2447,11 @@ mod tests {
     #[test]
     fn test_var_ansi_write_256() {
         let mut buf = Ansi::new(vec![]);
-        let _ = buf.write_color(false, &Color::Ansi256(7), false);
+        let _ = buf.write_color(false, Color::Ansi256(7), false);
         assert_eq!(buf.0, b"\x1B[48;5;7m");
 
         let mut buf = Ansi::new(vec![]);
-        let _ = buf.write_color(false, &Color::Ansi256(208), false);
+        let _ = buf.write_color(false, Color::Ansi256(208), false);
         assert_eq!(buf.0, b"\x1B[48;5;208m");
     }
 
@@ -2496,7 +2495,7 @@ mod tests {
                 "{:?} => {}",
                 color,
                 color.is_none()
-            )
+            );
         }
     }
 
@@ -2505,7 +2504,7 @@ mod tests {
         for color in all_attributes() {
             let mut color1 = color.clone();
             color1.clear();
-            assert!(color1.is_none(), "{:?} => {:?}", color, color1);
+            assert!(color1.is_none(), "{color:?} => {color1:?}");
         }
     }
 
