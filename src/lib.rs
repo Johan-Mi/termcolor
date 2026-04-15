@@ -714,15 +714,15 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
 impl<W: io::Write> io::Write for WriterInnerLock<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            WriterInnerLock::NoColor(wtr) => wtr.write(buf),
-            WriterInnerLock::Ansi(wtr) => wtr.write(buf),
+            Self::NoColor(wtr) => wtr.write(buf),
+            Self::Ansi(wtr) => wtr.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            WriterInnerLock::NoColor(wtr) => wtr.flush(),
-            WriterInnerLock::Ansi(wtr) => wtr.flush(),
+            Self::NoColor(wtr) => wtr.flush(),
+            Self::Ansi(wtr) => wtr.flush(),
         }
     }
 }
@@ -730,36 +730,36 @@ impl<W: io::Write> io::Write for WriterInnerLock<W> {
 impl<W: io::Write> WriteColor for WriterInnerLock<W> {
     fn supports_color(&self) -> bool {
         match self {
-            WriterInnerLock::NoColor(_) => false,
-            WriterInnerLock::Ansi(_) => true,
+            Self::NoColor(_) => false,
+            Self::Ansi(_) => true,
         }
     }
 
     fn supports_hyperlinks(&self) -> bool {
         match self {
-            WriterInnerLock::NoColor(_) => false,
-            WriterInnerLock::Ansi(_) => true,
+            Self::NoColor(_) => false,
+            Self::Ansi(_) => true,
         }
     }
 
     fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
         match self {
-            WriterInnerLock::NoColor(wtr) => wtr.set_color(spec),
-            WriterInnerLock::Ansi(wtr) => wtr.set_color(spec),
+            Self::NoColor(wtr) => wtr.set_color(spec),
+            Self::Ansi(wtr) => wtr.set_color(spec),
         }
     }
 
     fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
         match self {
-            WriterInnerLock::NoColor(wtr) => wtr.set_hyperlink(link),
-            WriterInnerLock::Ansi(wtr) => wtr.set_hyperlink(link),
+            Self::NoColor(wtr) => wtr.set_hyperlink(link),
+            Self::Ansi(wtr) => wtr.set_hyperlink(link),
         }
     }
 
     fn reset(&mut self) -> io::Result<()> {
         match self {
-            WriterInnerLock::NoColor(wtr) => wtr.reset(),
-            WriterInnerLock::Ansi(wtr) => wtr.reset(),
+            Self::NoColor(wtr) => wtr.reset(),
+            Self::Ansi(wtr) => wtr.reset(),
         }
     }
 
