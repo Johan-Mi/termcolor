@@ -892,12 +892,12 @@ impl Buffer {
 
     /// Create a buffer that drops all color information.
     pub const fn no_color() -> Self {
-        Self(BufferInner::NoColor(NoColor(vec![])))
+        Self(BufferInner::NoColor(NoColor(Vec::new())))
     }
 
     /// Create a buffer that uses ANSI escape sequences.
     pub const fn ansi() -> Self {
-        Self(BufferInner::Ansi(Ansi(vec![])))
+        Self(BufferInner::Ansi(Ansi(Vec::new())))
     }
 
     /// Returns true if and only if this buffer is empty.
@@ -1563,7 +1563,7 @@ impl Color {
                 })
             }
         } else if codes.len() == 3 {
-            let mut v = vec![];
+            let mut v = Vec::new();
             for code in codes {
                 let n = parse_number(code).ok_or_else(|| ParseColorError {
                     kind: ParseColorErrorKind::InvalidRgb,
@@ -1834,7 +1834,7 @@ mod tests {
 
     #[test]
     fn test_var_ansi_write_rgb() {
-        let mut buf = Ansi::new(vec![]);
+        let mut buf = Ansi::new(Vec::new());
         let _ = buf.write_color(true, Color::Rgb(254, 253, 255), false);
         assert_eq!(buf.0, b"\x1B[38;2;254;253;255m");
     }
@@ -1842,7 +1842,7 @@ mod tests {
     #[test]
     fn test_reset() {
         let spec = ColorSpec::new();
-        let mut buf = Ansi::new(vec![]);
+        let mut buf = Ansi::new(Vec::new());
         buf.set_color(&spec).unwrap();
         assert_eq!(buf.0, b"\x1B[0m");
     }
@@ -1852,24 +1852,24 @@ mod tests {
         let mut spec = ColorSpec::new();
         spec.set_reset(false);
 
-        let mut buf = Ansi::new(vec![]);
+        let mut buf = Ansi::new(Vec::new());
         buf.set_color(&spec).unwrap();
         assert_eq!(buf.0, b"");
     }
 
     #[test]
     fn test_var_ansi_write_256() {
-        let mut buf = Ansi::new(vec![]);
+        let mut buf = Ansi::new(Vec::new());
         let _ = buf.write_color(false, Color::Ansi256(7), false);
         assert_eq!(buf.0, b"\x1B[48;5;7m");
 
-        let mut buf = Ansi::new(vec![]);
+        let mut buf = Ansi::new(Vec::new());
         let _ = buf.write_color(false, Color::Ansi256(208), false);
         assert_eq!(buf.0, b"\x1B[48;5;208m");
     }
 
     fn all_attributes() -> Vec<ColorSpec> {
-        let mut result = vec![];
+        let mut result = Vec::new();
         for fg in [None, Some(Color::Red)] {
             for bg in [None, Some(Color::Red)] {
                 for bold in [false, true] {
@@ -1923,7 +1923,7 @@ mod tests {
 
     #[test]
     fn test_ansi_hyperlink() {
-        let mut buf = Ansi::new(vec![]);
+        let mut buf = Ansi::new(Vec::new());
         buf.set_hyperlink(&HyperlinkSpec::open(b"https://example.com"))
             .unwrap();
         buf.write_str("label").unwrap();
