@@ -1202,12 +1202,12 @@ impl Buffer {
     }
 
     /// Create a buffer that drops all color information.
-    pub fn no_color() -> Buffer {
+    pub const fn no_color() -> Buffer {
         Buffer(BufferInner::NoColor(NoColor(vec![])))
     }
 
     /// Create a buffer that uses ANSI escape sequences.
-    pub fn ansi() -> Buffer {
+    pub const fn ansi() -> Buffer {
         Buffer(BufferInner::Ansi(Ansi(vec![])))
     }
 
@@ -1218,12 +1218,12 @@ impl Buffer {
     }
 
     /// Returns true if and only if this buffer is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns the length of this buffer in bytes.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         match self.0 {
             BufferInner::NoColor(ref b) => b.0.len(),
             BufferInner::Ansi(ref b) => b.0.len(),
@@ -1362,7 +1362,7 @@ pub struct NoColor<W>(W);
 impl<W: Write> NoColor<W> {
     /// Create a new writer that satisfies `WriteColor` but drops all color
     /// information.
-    pub fn new(wtr: W) -> NoColor<W> {
+    pub const fn new(wtr: W) -> NoColor<W> {
         NoColor(wtr)
     }
 
@@ -1372,12 +1372,12 @@ impl<W: Write> NoColor<W> {
     }
 
     /// Return a reference to the inner writer.
-    pub fn get_ref(&self) -> &W {
+    pub const fn get_ref(&self) -> &W {
         &self.0
     }
 
     /// Return a mutable reference to the inner writer.
-    pub fn get_mut(&mut self) -> &mut W {
+    pub const fn get_mut(&mut self) -> &mut W {
         &mut self.0
     }
 }
@@ -1433,7 +1433,7 @@ pub struct Ansi<W>(W);
 impl<W: Write> Ansi<W> {
     /// Create a new writer that satisfies `WriteColor` using standard ANSI
     /// escape sequences.
-    pub fn new(wtr: W) -> Ansi<W> {
+    pub const fn new(wtr: W) -> Ansi<W> {
         Ansi(wtr)
     }
 
@@ -1443,12 +1443,12 @@ impl<W: Write> Ansi<W> {
     }
 
     /// Return a reference to the inner writer.
-    pub fn get_ref(&self) -> &W {
+    pub const fn get_ref(&self) -> &W {
         &self.0
     }
 
     /// Return a mutable reference to the inner writer.
-    pub fn get_mut(&mut self) -> &mut W {
+    pub const fn get_mut(&mut self) -> &mut W {
         &mut self.0
     }
 }
@@ -1829,23 +1829,23 @@ impl ColorSpec {
     }
 
     /// Get the foreground color.
-    pub fn fg(&self) -> Option<&Color> {
+    pub const fn fg(&self) -> Option<&Color> {
         self.fg_color.as_ref()
     }
 
     /// Set the foreground color.
-    pub fn set_fg(&mut self, color: Option<Color>) -> &mut ColorSpec {
+    pub const fn set_fg(&mut self, color: Option<Color>) -> &mut ColorSpec {
         self.fg_color = color;
         self
     }
 
     /// Get the background color.
-    pub fn bg(&self) -> Option<&Color> {
+    pub const fn bg(&self) -> Option<&Color> {
         self.bg_color.as_ref()
     }
 
     /// Set the background color.
-    pub fn set_bg(&mut self, color: Option<Color>) -> &mut ColorSpec {
+    pub const fn set_bg(&mut self, color: Option<Color>) -> &mut ColorSpec {
         self.bg_color = color;
         self
     }
@@ -1853,14 +1853,14 @@ impl ColorSpec {
     /// Get whether this is bold or not.
     ///
     /// Note that the bold setting has no effect in a Windows console.
-    pub fn bold(&self) -> bool {
+    pub const fn bold(&self) -> bool {
         self.bold
     }
 
     /// Set whether the text is bolded or not.
     ///
     /// Note that the bold setting has no effect in a Windows console.
-    pub fn set_bold(&mut self, yes: bool) -> &mut ColorSpec {
+    pub const fn set_bold(&mut self, yes: bool) -> &mut ColorSpec {
         self.bold = yes;
         self
     }
@@ -1868,14 +1868,14 @@ impl ColorSpec {
     /// Get whether this is dimmed or not.
     ///
     /// Note that the dimmed setting has no effect in a Windows console.
-    pub fn dimmed(&self) -> bool {
+    pub const fn dimmed(&self) -> bool {
         self.dimmed
     }
 
     /// Set whether the text is dimmed or not.
     ///
     /// Note that the dimmed setting has no effect in a Windows console.
-    pub fn set_dimmed(&mut self, yes: bool) -> &mut ColorSpec {
+    pub const fn set_dimmed(&mut self, yes: bool) -> &mut ColorSpec {
         self.dimmed = yes;
         self
     }
@@ -1883,14 +1883,14 @@ impl ColorSpec {
     /// Get whether this is italic or not.
     ///
     /// Note that the italic setting has no effect in a Windows console.
-    pub fn italic(&self) -> bool {
+    pub const fn italic(&self) -> bool {
         self.italic
     }
 
     /// Set whether the text is italicized or not.
     ///
     /// Note that the italic setting has no effect in a Windows console.
-    pub fn set_italic(&mut self, yes: bool) -> &mut ColorSpec {
+    pub const fn set_italic(&mut self, yes: bool) -> &mut ColorSpec {
         self.italic = yes;
         self
     }
@@ -1898,14 +1898,14 @@ impl ColorSpec {
     /// Get whether this is underline or not.
     ///
     /// Note that the underline setting has no effect in a Windows console.
-    pub fn underline(&self) -> bool {
+    pub const fn underline(&self) -> bool {
         self.underline
     }
 
     /// Set whether the text is underlined or not.
     ///
     /// Note that the underline setting has no effect in a Windows console.
-    pub fn set_underline(&mut self, yes: bool) -> &mut ColorSpec {
+    pub const fn set_underline(&mut self, yes: bool) -> &mut ColorSpec {
         self.underline = yes;
         self
     }
@@ -1913,14 +1913,14 @@ impl ColorSpec {
     /// Get whether this is strikethrough or not.
     ///
     /// Note that the strikethrough setting has no effect in a Windows console.
-    pub fn strikethrough(&self) -> bool {
+    pub const fn strikethrough(&self) -> bool {
         self.strikethrough
     }
 
     /// Set whether the text is strikethrough or not.
     ///
     /// Note that the strikethrough setting has no effect in a Windows console.
-    pub fn set_strikethrough(&mut self, yes: bool) -> &mut ColorSpec {
+    pub const fn set_strikethrough(&mut self, yes: bool) -> &mut ColorSpec {
         self.strikethrough = yes;
         self
     }
@@ -1932,7 +1932,7 @@ impl ColorSpec {
     /// settings are applied.
     ///
     /// Note that the reset setting has no effect in a Windows console.
-    pub fn reset(&self) -> bool {
+    pub const fn reset(&self) -> bool {
         self.reset
     }
 
@@ -1947,7 +1947,7 @@ impl ColorSpec {
     /// when using ANSI for colors.
     ///
     /// Note that the reset setting has no effect in a Windows console.
-    pub fn set_reset(&mut self, yes: bool) -> &mut ColorSpec {
+    pub const fn set_reset(&mut self, yes: bool) -> &mut ColorSpec {
         self.reset = yes;
         self
     }
@@ -1960,7 +1960,7 @@ impl ColorSpec {
     ///
     /// On Windows systems, this will output the ANSI escape sequence
     /// that will print a brighter version of the color specified.
-    pub fn intense(&self) -> bool {
+    pub const fn intense(&self) -> bool {
         self.intense
     }
 
@@ -1972,13 +1972,13 @@ impl ColorSpec {
     ///
     /// On Windows systems, this will output the ANSI escape sequence
     /// that will print a brighter version of the color specified.
-    pub fn set_intense(&mut self, yes: bool) -> &mut ColorSpec {
+    pub const fn set_intense(&mut self, yes: bool) -> &mut ColorSpec {
         self.intense = yes;
         self
     }
 
     /// Returns true if this color specification has no colors or styles.
-    pub fn is_none(&self) -> bool {
+    pub const fn is_none(&self) -> bool {
         self.fg_color.is_none()
             && self.bg_color.is_none()
             && !self.bold
@@ -1990,7 +1990,7 @@ impl ColorSpec {
     }
 
     /// Clears this color specification so that it has no color/style settings.
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         self.fg_color = None;
         self.bg_color = None;
         self.bold = false;
@@ -2238,17 +2238,17 @@ pub struct HyperlinkSpec<'a> {
 
 impl<'a> HyperlinkSpec<'a> {
     /// Creates a new hyperlink specification.
-    pub fn open(uri: &'a [u8]) -> HyperlinkSpec<'a> {
+    pub const fn open(uri: &'a [u8]) -> HyperlinkSpec<'a> {
         HyperlinkSpec { uri: Some(uri) }
     }
 
     /// Creates a hyperlink specification representing no hyperlink.
-    pub fn close() -> HyperlinkSpec<'a> {
+    pub const fn close() -> HyperlinkSpec<'a> {
         HyperlinkSpec { uri: None }
     }
 
     /// Returns the URI of the hyperlink if one is attached to this spec.
-    pub fn uri(&self) -> Option<&'a [u8]> {
+    pub const fn uri(&self) -> Option<&'a [u8]> {
         self.uri
     }
 }
@@ -2262,7 +2262,7 @@ struct LossyStandardStream<W> {
 
 impl<W: io::Write> LossyStandardStream<W> {
     #[cfg(not(windows))]
-    fn new(wtr: W) -> LossyStandardStream<W> {
+    const fn new(wtr: W) -> LossyStandardStream<W> {
         LossyStandardStream { wtr }
     }
 
@@ -2274,16 +2274,16 @@ impl<W: io::Write> LossyStandardStream<W> {
     }
 
     #[cfg(not(windows))]
-    fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
+    const fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
         LossyStandardStream::new(wtr)
     }
 
     #[cfg(windows)]
-    fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
+    const fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
         LossyStandardStream { wtr, is_console: self.is_console }
     }
 
-    fn get_ref(&self) -> &W {
+    const fn get_ref(&self) -> &W {
         &self.wtr
     }
 }
