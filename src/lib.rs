@@ -198,45 +198,45 @@ pub trait WriteColor: io::Write {
     }
 }
 
-impl<'a, T: ?Sized + WriteColor> WriteColor for &'a mut T {
+impl<T: ?Sized + WriteColor> WriteColor for &mut T {
     fn supports_color(&self) -> bool {
-        (&**self).supports_color()
+        (**self).supports_color()
     }
     fn supports_hyperlinks(&self) -> bool {
-        (&**self).supports_hyperlinks()
+        (**self).supports_hyperlinks()
     }
     fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        (&mut **self).set_color(spec)
+        (**self).set_color(spec)
     }
     fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
-        (&mut **self).set_hyperlink(link)
+        (**self).set_hyperlink(link)
     }
     fn reset(&mut self) -> io::Result<()> {
-        (&mut **self).reset()
+        (**self).reset()
     }
     fn is_synchronous(&self) -> bool {
-        (&**self).is_synchronous()
+        (**self).is_synchronous()
     }
 }
 
 impl<T: ?Sized + WriteColor> WriteColor for Box<T> {
     fn supports_color(&self) -> bool {
-        (&**self).supports_color()
+        (**self).supports_color()
     }
     fn supports_hyperlinks(&self) -> bool {
-        (&**self).supports_hyperlinks()
+        (**self).supports_hyperlinks()
     }
     fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        (&mut **self).set_color(spec)
+        (**self).set_color(spec)
     }
     fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
-        (&mut **self).set_hyperlink(link)
+        (**self).set_hyperlink(link)
     }
     fn reset(&mut self) -> io::Result<()> {
-        (&mut **self).reset()
+        (**self).reset()
     }
     fn is_synchronous(&self) -> bool {
-        (&**self).is_synchronous()
+        (**self).is_synchronous()
     }
 }
 
@@ -2145,20 +2145,18 @@ impl Color {
 
         let codes: Vec<&str> = s.split(',').collect();
         if codes.len() == 1 {
-            if let Some(n) = parse_number(&codes[0]) {
+            if let Some(n) = parse_number(codes[0]) {
                 Ok(Color::Ansi256(n))
+            } else if s.chars().all(|c| c.is_ascii_hexdigit()) {
+                Err(ParseColorError {
+                    kind: ParseColorErrorKind::InvalidAnsi256,
+                    given: s.to_string(),
+                })
             } else {
-                if s.chars().all(|c| c.is_digit(16)) {
-                    Err(ParseColorError {
-                        kind: ParseColorErrorKind::InvalidAnsi256,
-                        given: s.to_string(),
-                    })
-                } else {
-                    Err(ParseColorError {
-                        kind: ParseColorErrorKind::InvalidName,
-                        given: s.to_string(),
-                    })
-                }
+                Err(ParseColorError {
+                    kind: ParseColorErrorKind::InvalidName,
+                    given: s.to_string(),
+                })
             }
         } else if codes.len() == 3 {
             let mut v = vec![];
