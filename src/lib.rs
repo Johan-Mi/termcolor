@@ -110,7 +110,6 @@ use std::error;
 use std::fmt;
 use std::io::{self, Write};
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// This trait describes the behavior of writers that support colored output.
 pub trait WriteColor: io::Write {
@@ -763,8 +762,6 @@ impl<W: io::Write> WriteColor for WriterInnerLock<W> {
 #[derive(Debug)]
 pub struct BufferWriter {
     stream: IoStandardStream,
-    printed: AtomicBool,
-    separator: Option<Vec<u8>>,
     color_choice: ColorChoice,
 }
 
@@ -775,12 +772,7 @@ impl BufferWriter {
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
     const fn create(stream: IoStandardStream, choice: ColorChoice) -> Self {
-        Self {
-            stream,
-            printed: AtomicBool::new(false),
-            separator: None,
-            color_choice: choice,
-        }
+        Self { stream, color_choice: choice }
     }
 
     /// Create a new `BufferWriter` that writes to stdout with the given
@@ -801,14 +793,6 @@ impl BufferWriter {
         Self::create(IoStandardStream::Stderr(io::stderr()), choice)
     }
 
-    /// If set, the separator given is printed between buffers. By default, no
-    /// separator is printed.
-    ///
-    /// The default value is `None`.
-    pub fn separator(&mut self, sep: Option<Vec<u8>>) {
-        self.separator = sep;
-    }
-
     /// Creates a new `Buffer` with the current color preferences.
     ///
     /// A `Buffer` satisfies both `io::Write` and `WriteColor`. A `Buffer` can
@@ -827,17 +811,10 @@ impl BufferWriter {
             return Ok(());
         }
         let mut stream = self.stream.lock();
-        if let Some(sep) = &self.separator
-            && self.printed.load(Ordering::Relaxed)
-        {
-            stream.write_all(sep)?;
-            stream.write_all(b"\n")?;
-        }
         match &buf.0 {
             BufferInner::NoColor(b) => stream.write_all(&b.0)?,
             BufferInner::Ansi(b) => stream.write_all(&b.0)?,
         }
-        self.printed.store(true, Ordering::Relaxed);
         Ok(())
     }
 }
