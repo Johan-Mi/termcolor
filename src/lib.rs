@@ -474,7 +474,7 @@ impl StandardStreamLock<'_> {
             }
             WriterInner::Ansi(w) => WriterInnerLock::Ansi(Ansi(w.0.lock())),
         };
-        StandardStreamLock { wtr: stream.wtr.wrap(locked) }
+        StandardStreamLock { wtr: LossyStandardStream::new(locked) }
     }
 }
 
@@ -842,7 +842,8 @@ impl BufferWriter {
         if buf.is_empty() {
             return Ok(());
         }
-        let mut stream = self.stream.wrap(self.stream.get_ref().lock());
+        let mut stream =
+            LossyStandardStream::new(self.stream.get_ref().lock());
         if let Some(sep) = &self.separator
             && self.printed.load(Ordering::Relaxed)
         {
@@ -1697,11 +1698,6 @@ struct LossyStandardStream<W> {
 impl<W: io::Write> LossyStandardStream<W> {
     const fn new(wtr: W) -> Self {
         Self { wtr }
-    }
-
-    const fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
-        _ = self;
-        LossyStandardStream::new(wtr)
     }
 
     const fn get_ref(&self) -> &W {
