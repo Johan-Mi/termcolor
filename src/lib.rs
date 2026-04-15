@@ -338,9 +338,9 @@ impl IoStandardStream {
     }
 
     fn lock(&self) -> IoStandardStreamLock<'_> {
-        match *self {
-            Self::Stdout(ref s) => IoStandardStreamLock::StdoutLock(s.lock()),
-            Self::Stderr(ref s) => IoStandardStreamLock::StderrLock(s.lock()),
+        match self {
+            Self::Stdout(s) => IoStandardStreamLock::StdoutLock(s.lock()),
+            Self::Stderr(s) => IoStandardStreamLock::StderrLock(s.lock()),
             Self::StdoutBuffered(_) | Self::StderrBuffered(_) => {
                 // We don't permit this case to ever occur in the public API,
                 // so it's OK to panic.
@@ -353,21 +353,21 @@ impl IoStandardStream {
 impl io::Write for IoStandardStream {
     #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
-        match *self {
-            Self::Stdout(ref mut s) => s.write(b),
-            Self::Stderr(ref mut s) => s.write(b),
-            Self::StdoutBuffered(ref mut s) => s.write(b),
-            Self::StderrBuffered(ref mut s) => s.write(b),
+        match self {
+            Self::Stdout(s) => s.write(b),
+            Self::Stderr(s) => s.write(b),
+            Self::StdoutBuffered(s) => s.write(b),
+            Self::StderrBuffered(s) => s.write(b),
         }
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        match *self {
-            Self::Stdout(ref mut s) => s.flush(),
-            Self::Stderr(ref mut s) => s.flush(),
-            Self::StdoutBuffered(ref mut s) => s.flush(),
-            Self::StderrBuffered(ref mut s) => s.flush(),
+        match self {
+            Self::Stdout(s) => s.flush(),
+            Self::Stderr(s) => s.flush(),
+            Self::StdoutBuffered(s) => s.flush(),
+            Self::StderrBuffered(s) => s.flush(),
         }
     }
 }
@@ -383,17 +383,17 @@ enum IoStandardStreamLock<'a> {
 impl io::Write for IoStandardStreamLock<'_> {
     #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
-        match *self {
-            IoStandardStreamLock::StdoutLock(ref mut s) => s.write(b),
-            IoStandardStreamLock::StderrLock(ref mut s) => s.write(b),
+        match self {
+            IoStandardStreamLock::StdoutLock(s) => s.write(b),
+            IoStandardStreamLock::StderrLock(s) => s.write(b),
         }
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        match *self {
-            IoStandardStreamLock::StdoutLock(ref mut s) => s.flush(),
-            IoStandardStreamLock::StderrLock(ref mut s) => s.flush(),
+        match self {
+            IoStandardStreamLock::StdoutLock(s) => s.flush(),
+            IoStandardStreamLock::StderrLock(s) => s.flush(),
         }
     }
 }
@@ -474,13 +474,11 @@ impl StandardStream {
 
 impl StandardStreamLock<'_> {
     fn from_stream(stream: &StandardStream) -> StandardStreamLock<'_> {
-        let locked = match *stream.wtr.get_ref() {
-            WriterInner::NoColor(ref w) => {
+        let locked = match stream.wtr.get_ref() {
+            WriterInner::NoColor(w) => {
                 WriterInnerLock::NoColor(NoColor(w.0.lock()))
             }
-            WriterInner::Ansi(ref w) => {
-                WriterInnerLock::Ansi(Ansi(w.0.lock()))
-            }
+            WriterInner::Ansi(w) => WriterInnerLock::Ansi(Ansi(w.0.lock())),
         };
         StandardStreamLock { wtr: stream.wtr.wrap(locked) }
     }
@@ -663,54 +661,54 @@ impl WriteColor for BufferedStandardStream {
 impl<W: io::Write> io::Write for WriterInner<W> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match *self {
-            Self::NoColor(ref mut wtr) => wtr.write(buf),
-            Self::Ansi(ref mut wtr) => wtr.write(buf),
+        match self {
+            Self::NoColor(wtr) => wtr.write(buf),
+            Self::Ansi(wtr) => wtr.write(buf),
         }
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        match *self {
-            Self::NoColor(ref mut wtr) => wtr.flush(),
-            Self::Ansi(ref mut wtr) => wtr.flush(),
+        match self {
+            Self::NoColor(wtr) => wtr.flush(),
+            Self::Ansi(wtr) => wtr.flush(),
         }
     }
 }
 
 impl<W: io::Write> WriteColor for WriterInner<W> {
     fn supports_color(&self) -> bool {
-        match *self {
+        match self {
             Self::NoColor(_) => false,
             Self::Ansi(_) => true,
         }
     }
 
     fn supports_hyperlinks(&self) -> bool {
-        match *self {
+        match self {
             Self::NoColor(_) => false,
             Self::Ansi(_) => true,
         }
     }
 
     fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        match *self {
-            Self::NoColor(ref mut wtr) => wtr.set_color(spec),
-            Self::Ansi(ref mut wtr) => wtr.set_color(spec),
+        match self {
+            Self::NoColor(wtr) => wtr.set_color(spec),
+            Self::Ansi(wtr) => wtr.set_color(spec),
         }
     }
 
     fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
-        match *self {
-            Self::NoColor(ref mut wtr) => wtr.set_hyperlink(link),
-            Self::Ansi(ref mut wtr) => wtr.set_hyperlink(link),
+        match self {
+            Self::NoColor(wtr) => wtr.set_hyperlink(link),
+            Self::Ansi(wtr) => wtr.set_hyperlink(link),
         }
     }
 
     fn reset(&mut self) -> io::Result<()> {
-        match *self {
-            Self::NoColor(ref mut wtr) => wtr.reset(),
-            Self::Ansi(ref mut wtr) => wtr.reset(),
+        match self {
+            Self::NoColor(wtr) => wtr.reset(),
+            Self::Ansi(wtr) => wtr.reset(),
         }
     }
 
@@ -721,61 +719,58 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
 
 impl<W: io::Write> io::Write for WriterInnerLock<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match *self {
-            WriterInnerLock::NoColor(ref mut wtr) => wtr.write(buf),
-            WriterInnerLock::Ansi(ref mut wtr) => wtr.write(buf),
+        match self {
+            WriterInnerLock::NoColor(wtr) => wtr.write(buf),
+            WriterInnerLock::Ansi(wtr) => wtr.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        match *self {
-            WriterInnerLock::NoColor(ref mut wtr) => wtr.flush(),
-            WriterInnerLock::Ansi(ref mut wtr) => wtr.flush(),
+        match self {
+            WriterInnerLock::NoColor(wtr) => wtr.flush(),
+            WriterInnerLock::Ansi(wtr) => wtr.flush(),
         }
     }
 }
 
 impl<W: io::Write> WriteColor for WriterInnerLock<W> {
     fn supports_color(&self) -> bool {
-        match *self {
+        match self {
             WriterInnerLock::NoColor(_) => false,
             WriterInnerLock::Ansi(_) => true,
         }
     }
 
     fn supports_hyperlinks(&self) -> bool {
-        match *self {
+        match self {
             WriterInnerLock::NoColor(_) => false,
             WriterInnerLock::Ansi(_) => true,
         }
     }
 
     fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        match *self {
-            WriterInnerLock::NoColor(ref mut wtr) => wtr.set_color(spec),
-            WriterInnerLock::Ansi(ref mut wtr) => wtr.set_color(spec),
+        match self {
+            WriterInnerLock::NoColor(wtr) => wtr.set_color(spec),
+            WriterInnerLock::Ansi(wtr) => wtr.set_color(spec),
         }
     }
 
     fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
-        match *self {
-            WriterInnerLock::NoColor(ref mut wtr) => wtr.set_hyperlink(link),
-            WriterInnerLock::Ansi(ref mut wtr) => wtr.set_hyperlink(link),
+        match self {
+            WriterInnerLock::NoColor(wtr) => wtr.set_hyperlink(link),
+            WriterInnerLock::Ansi(wtr) => wtr.set_hyperlink(link),
         }
     }
 
     fn reset(&mut self) -> io::Result<()> {
-        match *self {
-            WriterInnerLock::NoColor(ref mut wtr) => wtr.reset(),
-            WriterInnerLock::Ansi(ref mut wtr) => wtr.reset(),
+        match self {
+            WriterInnerLock::NoColor(wtr) => wtr.reset(),
+            WriterInnerLock::Ansi(wtr) => wtr.reset(),
         }
     }
 
     fn is_synchronous(&self) -> bool {
-        match *self {
-            WriterInnerLock::NoColor(_) => false,
-            WriterInnerLock::Ansi(_) => false,
-        }
+        false
     }
 }
 
@@ -854,15 +849,15 @@ impl BufferWriter {
             return Ok(());
         }
         let mut stream = self.stream.wrap(self.stream.get_ref().lock());
-        if let Some(ref sep) = self.separator
+        if let Some(sep) = &self.separator
             && self.printed.load(Ordering::Relaxed)
         {
             stream.write_all(sep)?;
             stream.write_all(b"\n")?;
         }
-        match buf.0 {
-            BufferInner::NoColor(ref b) => stream.write_all(&b.0)?,
-            BufferInner::Ansi(ref b) => stream.write_all(&b.0)?,
+        match &buf.0 {
+            BufferInner::NoColor(b) => stream.write_all(&b.0)?,
+            BufferInner::Ansi(b) => stream.write_all(&b.0)?,
         }
         self.printed.store(true, Ordering::Relaxed);
         Ok(())
@@ -918,17 +913,17 @@ impl Buffer {
 
     /// Returns the length of this buffer in bytes.
     pub const fn len(&self) -> usize {
-        match self.0 {
-            BufferInner::NoColor(ref b) => b.0.len(),
-            BufferInner::Ansi(ref b) => b.0.len(),
+        match &self.0 {
+            BufferInner::NoColor(b) => b.0.len(),
+            BufferInner::Ansi(b) => b.0.len(),
         }
     }
 
     /// Clears this buffer.
     pub fn clear(&mut self) {
-        match self.0 {
-            BufferInner::NoColor(ref mut b) => b.0.clear(),
-            BufferInner::Ansi(ref mut b) => b.0.clear(),
+        match &mut self.0 {
+            BufferInner::NoColor(b) => b.0.clear(),
+            BufferInner::Ansi(b) => b.0.clear(),
         }
     }
 
@@ -942,17 +937,17 @@ impl Buffer {
 
     /// Return the underlying data of the buffer.
     pub fn as_slice(&self) -> &[u8] {
-        match self.0 {
-            BufferInner::NoColor(ref b) => &b.0,
-            BufferInner::Ansi(ref b) => &b.0,
+        match &self.0 {
+            BufferInner::NoColor(b) => &b.0,
+            BufferInner::Ansi(b) => &b.0,
         }
     }
 
     /// Return the underlying data of the buffer as a mutable slice.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        match self.0 {
-            BufferInner::NoColor(ref mut b) => &mut b.0,
-            BufferInner::Ansi(ref mut b) => &mut b.0,
+        match &mut self.0 {
+            BufferInner::NoColor(b) => &mut b.0,
+            BufferInner::Ansi(b) => &mut b.0,
         }
     }
 }
@@ -960,17 +955,17 @@ impl Buffer {
 impl io::Write for Buffer {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.0 {
-            BufferInner::NoColor(ref mut w) => w.write(buf),
-            BufferInner::Ansi(ref mut w) => w.write(buf),
+        match &mut self.0 {
+            BufferInner::NoColor(w) => w.write(buf),
+            BufferInner::Ansi(w) => w.write(buf),
         }
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        match self.0 {
-            BufferInner::NoColor(ref mut w) => w.flush(),
-            BufferInner::Ansi(ref mut w) => w.flush(),
+        match &mut self.0 {
+            BufferInner::NoColor(w) => w.flush(),
+            BufferInner::Ansi(w) => w.flush(),
         }
     }
 }
@@ -994,25 +989,25 @@ impl WriteColor for Buffer {
 
     #[inline]
     fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        match self.0 {
-            BufferInner::NoColor(ref mut w) => w.set_color(spec),
-            BufferInner::Ansi(ref mut w) => w.set_color(spec),
+        match &mut self.0 {
+            BufferInner::NoColor(w) => w.set_color(spec),
+            BufferInner::Ansi(w) => w.set_color(spec),
         }
     }
 
     #[inline]
     fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
-        match self.0 {
-            BufferInner::NoColor(ref mut w) => w.set_hyperlink(link),
-            BufferInner::Ansi(ref mut w) => w.set_hyperlink(link),
+        match &mut self.0 {
+            BufferInner::NoColor(w) => w.set_hyperlink(link),
+            BufferInner::Ansi(w) => w.set_hyperlink(link),
         }
     }
 
     #[inline]
     fn reset(&mut self) -> io::Result<()> {
-        match self.0 {
-            BufferInner::NoColor(ref mut w) => w.reset(),
-            BufferInner::Ansi(ref mut w) => w.reset(),
+        match &mut self.0 {
+            BufferInner::NoColor(w) => w.reset(),
+            BufferInner::Ansi(w) => w.reset(),
         }
     }
 
