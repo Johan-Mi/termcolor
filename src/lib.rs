@@ -39,7 +39,7 @@ except it is augmented with methods for coloring by the `WriteColor` trait.
 For example, to write some green text:
 
 ```rust,no_run
-# fn test() -> Result<(), Box<::std::error::Error>> {
+# fn test() -> Result<(), Box<dyn std::error::Error>> {
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -66,7 +66,7 @@ implements `io::Write` and `io::WriteColor`.
 This example shows how to print some green text to stderr.
 
 ```rust,no_run
-# fn test() -> Result<(), Box<::std::error::Error>> {
+# fn test() -> Result<(), Box<dyn std::error::Error>> {
 use std::io::Write;
 use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, WriteColor};
 
