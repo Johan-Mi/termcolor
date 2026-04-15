@@ -1,10 +1,9 @@
 termcolor
 =========
-A simple cross platform library for writing colored text to a terminal. This
-library writes colored text either using standard ANSI escape sequences or by
-interacting with the Windows console. Several convenient abstractions are
-provided for use in single-threaded or multi-threaded command line
-applications.
+A simple cross platform library for writing colored text to a terminal.
+This library writes colored text using standard ANSI escape sequences.
+Several convenient abstractions are provided for use in single-threaded or
+multi-threaded command line applications.
 
 [![Build status](https://github.com/BurntSushi/termcolor/workflows/ci/badge.svg)](https://github.com/BurntSushi/termcolor/actions)
 [![crates.io](https://img.shields.io/crates/v/termcolor.svg)](https://crates.io/crates/termcolor)
@@ -30,14 +29,11 @@ and `std::io::StderrLock`.
 
 `Buffer` is an in memory buffer that supports colored text. In a parallel
 program, each thread might write to its own buffer. A buffer can be printed to
-stdout or stderr using a `BufferWriter`. The advantage of this design is that
-each thread can work in parallel on a buffer without having to synchronize
-access to global resources such as the Windows console. Moreover, this design
-also prevents interleaving of buffer output.
+stdout or stderr using a `BufferWriter`. This design prevents interleaving of
+buffer output.
 
 `Ansi` and `NoColor` both satisfy `WriteColor` for arbitrary implementors of
-`io::Write`. These types are useful when you know exactly what you need. An
-analogous type for the Windows console is not provided since it cannot exist.
+`io::Write`. These types are useful when you know exactly what you need.
 
 ### Example: using `StandardStream`
 

@@ -9,13 +9,10 @@ documentation = "https://docs.rs/termcolor"
 homepage = "https://github.com/BurntSushi/termcolor"
 repository = "https://github.com/BurntSushi/termcolor"
 readme = "README.md"
-keywords = ["windows", "win", "color", "ansi", "console"]
+keywords = ["color", "ansi"]
 license = "Unlicense OR MIT"
 edition = "2024"
 
 [lib]
 name = "termcolor"
 bench = false
-
-[target.'cfg(windows)'.dependencies]
-winapi-util = "0.1.3"

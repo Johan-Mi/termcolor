@@ -1,16 +1,13 @@
 /*!
-This crate provides a cross platform abstraction for writing colored text to
-a terminal. Colors are written using either ANSI escape sequences or by
-communicating with a Windows console. Much of this API was motivated by use
-inside command line applications, where colors or styles can be configured
-by the end user and/or the environment.
+This crate provides a cross platform abstraction for writing colored text to a
+terminal. Colors are written using ANSI escape sequences. Much of this API was
+motivated by use inside command line applications, where colors or styles can be
+configured by the end user and/or the environment.
 
 This crate also provides platform independent support for writing colored text
-to an in memory buffer. While this is easy to do with ANSI escape sequences
-(because they are in the buffer themselves), it is trickier to do with the
-Windows console API, which requires synchronous communication.
+to an in memory buffer.
 
-In ANSI mode, this crate also provides support for writing hyperlinks.
+This crate also provides support for writing hyperlinks.
 
 # Organization
 
@@ -23,14 +20,10 @@ and `std::io::StderrLock`.
 
 `Buffer` is an in memory buffer that supports colored text. In a parallel
 program, each thread might write to its own buffer. A buffer can be printed to
-using a `BufferWriter`. The advantage of this design is that each thread can
-work in parallel on a buffer without having to synchronize access to global
-resources such as the Windows console. Moreover, this design also prevents
-interleaving of buffer output.
+using a `BufferWriter`. This design prevents interleaving of buffer output.
 
 `Ansi` and `NoColor` both satisfy `WriteColor` for arbitrary implementors of
-`io::Write`. These types are useful when you know exactly what you need. An
-analogous type for the Windows console is not provided since it cannot exist.
+`io::Write`. These types are useful when you know exactly what you need.
 
 # Example: using `StandardStream`
 
@@ -82,14 +75,9 @@ bufwtr.print(&buffer)?;
 
 In many scenarios when using color, one often wants to enable colors
 automatically when writing to a terminal and disable colors automatically when
-writing to anything else. The typical way to achieve this in Unix environments
-is via libc's
-[`isatty`](https://man7.org/linux/man-pages/man3/isatty.3.html)
-function.
-Unfortunately, this notoriously does not work well in Windows environments. To
-work around that, the recommended solution is to use the standard library's
-[`IsTerminal`](https://doc.rust-lang.org/std/io/trait.IsTerminal.html) trait.
-It goes out of its way to get it as right as possible in Windows environments.
+writing to anything else. The typical way to achieve this is to use the standard
+library's [`IsTerminal`](https://doc.rust-lang.org/std/io/trait.IsTerminal.html)
+trait.
 
 For example, in a command line application that exposes a `--color` flag,
 your logic for how to enable colors might look like this:
@@ -123,11 +111,6 @@ use std::fmt;
 use std::io::{self, Write};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(windows)]
-use std::sync::{Mutex, MutexGuard};
-
-#[cfg(windows)]
-use winapi_util::console as wincon;
 
 /// This trait describes the behavior of writers that support colored output.
 pub trait WriteColor: io::Write {
@@ -156,9 +139,6 @@ pub trait WriteColor: io::Write {
     /// Returns true if and only if the underlying writer must synchronously
     /// interact with an end user's device in order to control colors. By
     /// default, this always returns `false`.
-    ///
-    /// In practice, this should return `true` if the underlying writer is
-    /// manipulating colors using the Windows console APIs.
     ///
     /// This is useful for writing generic code (such as a buffered writer)
     /// that can perform certain optimizations when the underlying writer
@@ -249,15 +229,10 @@ impl<T: ?Sized + WriteColor> WriteColor for Box<T> {
 /// results in an error.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ColorChoice {
-    /// Try very hard to emit colors. This includes emitting ANSI colors
-    /// on Windows if the console API is unavailable.
+    /// Try very hard to emit colors.
     Always,
-    /// `AlwaysAnsi` is like `Always`, except it never tries to use anything
-    /// other than emitting ANSI color codes.
-    AlwaysAnsi,
-    /// Try to use colors, but don't force the issue. If the console isn't
-    /// available on Windows, or if `TERM=dumb`, or if `NO_COLOR` is defined, for
-    /// example, then don't use colors.
+    /// Try to use colors, but don't force the issue. If `TERM=dumb`, or if
+    /// `NO_COLOR` is defined, for example, then don't use colors.
     Auto,
     /// Never emit colors.
     Never,
@@ -276,7 +251,6 @@ impl FromStr for ColorChoice {
     fn from_str(s: &str) -> Result<Self, ColorChoiceParseError> {
         match s.to_lowercase().as_str() {
             "always" => Ok(Self::Always),
-            "always-ansi" => Ok(Self::AlwaysAnsi),
             "never" => Ok(Self::Never),
             "auto" => Ok(Self::Auto),
             unknown => Err(ColorChoiceParseError {
@@ -290,7 +264,7 @@ impl ColorChoice {
     /// Returns true if we should attempt to write colored output.
     fn should_attempt_color(self) -> bool {
         match self {
-            Self::Always | Self::AlwaysAnsi => true,
+            Self::Always => true,
             Self::Never => false,
             Self::Auto => Self::env_allows_color(),
         }
@@ -305,28 +279,6 @@ impl ColorChoice {
                     // probably doesn't support colors, or Windows.
                     && env::var_os("TERM")
                         .map_or(cfg!(windows), |it| it != "dumb")))
-    }
-
-    /// Returns true if this choice should forcefully use ANSI color codes.
-    ///
-    /// It's possible that ANSI is still the correct choice even if this
-    /// returns false.
-    #[cfg(windows)]
-    fn should_ansi(&self) -> bool {
-        match *self {
-            ColorChoice::Always => false,
-            ColorChoice::AlwaysAnsi => true,
-            ColorChoice::Never => false,
-            ColorChoice::Auto => {
-                match env::var("TERM") {
-                    Err(_) => false,
-                    // cygwin doesn't seem to support ANSI escape sequences
-                    // and instead has its own variety. However, the Windows
-                    // console API may be available.
-                    Ok(k) => k != "dumb" && k != "cygwin",
-                }
-            }
-        }
     }
 }
 
@@ -462,7 +414,7 @@ pub struct StandardStream {
 /// `StandardStream`.
 #[derive(Debug)]
 pub struct StandardStreamLock<'a> {
-    wtr: LossyStandardStream<WriterInnerLock<'a, IoStandardStreamLock<'a>>>,
+    wtr: LossyStandardStream<WriterInnerLock<IoStandardStreamLock<'a>>>,
 }
 
 /// Like `StandardStream`, but does buffered writing.
@@ -477,38 +429,19 @@ pub struct BufferedStandardStream {
 enum WriterInner<W> {
     NoColor(NoColor<W>),
     Ansi(Ansi<W>),
-    #[cfg(windows)]
-    Windows {
-        wtr: W,
-        console: Mutex<wincon::Console>,
-    },
 }
 
 /// `WriterInnerLock` is a (limited) generic representation of a writer. It is
 /// limited because W should only ever be stdout/stderr on Windows.
 #[derive(Debug)]
-enum WriterInnerLock<'a, W> {
+enum WriterInnerLock<W> {
     NoColor(NoColor<W>),
     Ansi(Ansi<W>),
-    /// What a gross hack. On Windows, we need to specify a lifetime for the
-    /// console when in a locked state, but obviously don't need to do that
-    /// on Unix, which makes the `'a` unused. To satisfy the compiler, we need
-    /// a `PhantomData`.
-    #[allow(dead_code)]
-    Unreachable(::std::marker::PhantomData<&'a ()>),
-    #[cfg(windows)]
-    Windows {
-        wtr: W,
-        console: MutexGuard<'a, wincon::Console>,
-    },
 }
 
 impl StandardStream {
     /// Create a new `StandardStream` with the given color preferences that
     /// writes to standard output.
-    ///
-    /// On Windows, if coloring is desired and a Windows console could not be
-    /// found, then ANSI escape sequences are used instead.
     ///
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
@@ -519,9 +452,6 @@ impl StandardStream {
 
     /// Create a new `StandardStream` with the given color preferences that
     /// writes to standard error.
-    ///
-    /// On Windows, if coloring is desired and a Windows console could not be
-    /// found, then ANSI escape sequences are used instead.
     ///
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
@@ -543,7 +473,6 @@ impl StandardStream {
 }
 
 impl StandardStreamLock<'_> {
-    #[cfg(not(windows))]
     fn from_stream(stream: &StandardStream) -> StandardStreamLock<'_> {
         let locked = match *stream.wtr.get_ref() {
             WriterInner::NoColor(ref w) => {
@@ -555,34 +484,11 @@ impl StandardStreamLock<'_> {
         };
         StandardStreamLock { wtr: stream.wtr.wrap(locked) }
     }
-
-    #[cfg(windows)]
-    fn from_stream(stream: &StandardStream) -> StandardStreamLock {
-        let locked = match *stream.wtr.get_ref() {
-            WriterInner::NoColor(ref w) => {
-                WriterInnerLock::NoColor(NoColor(w.0.lock()))
-            }
-            WriterInner::Ansi(ref w) => {
-                WriterInnerLock::Ansi(Ansi(w.0.lock()))
-            }
-            #[cfg(windows)]
-            WriterInner::Windows { ref wtr, ref console } => {
-                WriterInnerLock::Windows {
-                    wtr: wtr.lock(),
-                    console: console.lock().unwrap(),
-                }
-            }
-        };
-        StandardStreamLock { wtr: stream.wtr.wrap(locked) }
-    }
 }
 
 impl BufferedStandardStream {
     /// Create a new `BufferedStandardStream` with the given color preferences
     /// that writes to standard output via a buffered writer.
-    ///
-    /// On Windows, if coloring is desired and a Windows console could not be
-    /// found, then ANSI escape sequences are used instead.
     ///
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
@@ -594,9 +500,6 @@ impl BufferedStandardStream {
 
     /// Create a new `BufferedStandardStream` with the given color preferences
     /// that writes to standard error via a buffered writer.
-    ///
-    /// On Windows, if coloring is desired and a Windows console could not be
-    /// found, then ANSI escape sequences are used instead.
     ///
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
@@ -610,48 +513,11 @@ impl BufferedStandardStream {
 impl WriterInner<IoStandardStream> {
     /// Create a new inner writer for a standard stream with the given color
     /// preferences.
-    #[cfg(not(windows))]
     fn create(sty: StandardStreamType, choice: ColorChoice) -> Self {
         if choice.should_attempt_color() {
             Self::Ansi(Ansi(IoStandardStream::new(sty)))
         } else {
             Self::NoColor(NoColor(IoStandardStream::new(sty)))
-        }
-    }
-
-    /// Create a new inner writer for a standard stream with the given color
-    /// preferences.
-    ///
-    /// If coloring is desired and a Windows console could not be found, then
-    /// ANSI escape sequences are used instead.
-    #[cfg(windows)]
-    fn create(
-        sty: StandardStreamType,
-        choice: ColorChoice,
-    ) -> WriterInner<IoStandardStream> {
-        let mut con = match sty {
-            StandardStreamType::Stdout => wincon::Console::stdout(),
-            StandardStreamType::Stderr => wincon::Console::stderr(),
-            StandardStreamType::StdoutBuffered => wincon::Console::stdout(),
-            StandardStreamType::StderrBuffered => wincon::Console::stderr(),
-        };
-        let is_console_virtual = con
-            .as_mut()
-            .map(|con| con.set_virtual_terminal_processing(true).is_ok())
-            .unwrap_or(false);
-        if choice.should_attempt_color() {
-            if choice.should_ansi() || is_console_virtual {
-                WriterInner::Ansi(Ansi(IoStandardStream::new(sty)))
-            } else if let Ok(console) = con {
-                WriterInner::Windows {
-                    wtr: IoStandardStream::new(sty),
-                    console: Mutex::new(console),
-                }
-            } else {
-                WriterInner::Ansi(Ansi(IoStandardStream::new(sty)))
-            }
-        } else {
-            WriterInner::NoColor(NoColor(IoStandardStream::new(sty)))
         }
     }
 }
@@ -800,8 +666,6 @@ impl<W: io::Write> io::Write for WriterInner<W> {
         match *self {
             Self::NoColor(ref mut wtr) => wtr.write(buf),
             Self::Ansi(ref mut wtr) => wtr.write(buf),
-            #[cfg(windows)]
-            Self::Windows { ref mut wtr, .. } => wtr.write(buf),
         }
     }
 
@@ -810,8 +674,6 @@ impl<W: io::Write> io::Write for WriterInner<W> {
         match *self {
             Self::NoColor(ref mut wtr) => wtr.flush(),
             Self::Ansi(ref mut wtr) => wtr.flush(),
-            #[cfg(windows)]
-            Self::Windows { ref mut wtr, .. } => wtr.flush(),
         }
     }
 }
@@ -821,8 +683,6 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
         match *self {
             Self::NoColor(_) => false,
             Self::Ansi(_) => true,
-            #[cfg(windows)]
-            Self::Windows { .. } => true,
         }
     }
 
@@ -830,8 +690,6 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
         match *self {
             Self::NoColor(_) => false,
             Self::Ansi(_) => true,
-            #[cfg(windows)]
-            Self::Windows { .. } => false,
         }
     }
 
@@ -839,12 +697,6 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
         match *self {
             Self::NoColor(ref mut wtr) => wtr.set_color(spec),
             Self::Ansi(ref mut wtr) => wtr.set_color(spec),
-            #[cfg(windows)]
-            Self::Windows { ref mut wtr, ref console } => {
-                wtr.flush()?;
-                let mut console = console.lock().unwrap();
-                spec.write_console(&mut *console)
-            }
         }
     }
 
@@ -852,8 +704,6 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
         match *self {
             Self::NoColor(ref mut wtr) => wtr.set_hyperlink(link),
             Self::Ansi(ref mut wtr) => wtr.set_hyperlink(link),
-            #[cfg(windows)]
-            Self::Windows { .. } => Ok(()),
         }
     }
 
@@ -861,112 +711,70 @@ impl<W: io::Write> WriteColor for WriterInner<W> {
         match *self {
             Self::NoColor(ref mut wtr) => wtr.reset(),
             Self::Ansi(ref mut wtr) => wtr.reset(),
-            #[cfg(windows)]
-            Self::Windows { ref mut wtr, ref mut console } => {
-                wtr.flush()?;
-                console.lock().unwrap().reset()?;
-                Ok(())
-            }
         }
     }
 
     fn is_synchronous(&self) -> bool {
-        match *self {
-            Self::NoColor(_) => false,
-            Self::Ansi(_) => false,
-            #[cfg(windows)]
-            Self::Windows { .. } => true,
-        }
+        false
     }
 }
 
-impl<W: io::Write> io::Write for WriterInnerLock<'_, W> {
+impl<W: io::Write> io::Write for WriterInnerLock<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(ref mut wtr) => wtr.write(buf),
             WriterInnerLock::Ansi(ref mut wtr) => wtr.write(buf),
-            #[cfg(windows)]
-            WriterInnerLock::Windows { ref mut wtr, .. } => wtr.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(ref mut wtr) => wtr.flush(),
             WriterInnerLock::Ansi(ref mut wtr) => wtr.flush(),
-            #[cfg(windows)]
-            WriterInnerLock::Windows { ref mut wtr, .. } => wtr.flush(),
         }
     }
 }
 
-impl<W: io::Write> WriteColor for WriterInnerLock<'_, W> {
+impl<W: io::Write> WriteColor for WriterInnerLock<W> {
     fn supports_color(&self) -> bool {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(_) => false,
             WriterInnerLock::Ansi(_) => true,
-            #[cfg(windows)]
-            WriterInnerLock::Windows { .. } => true,
         }
     }
 
     fn supports_hyperlinks(&self) -> bool {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(_) => false,
             WriterInnerLock::Ansi(_) => true,
-            #[cfg(windows)]
-            WriterInnerLock::Windows { .. } => false,
         }
     }
 
     fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(ref mut wtr) => wtr.set_color(spec),
             WriterInnerLock::Ansi(ref mut wtr) => wtr.set_color(spec),
-            #[cfg(windows)]
-            WriterInnerLock::Windows { ref mut wtr, ref mut console } => {
-                wtr.flush()?;
-                spec.write_console(console)
-            }
         }
     }
 
     fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(ref mut wtr) => wtr.set_hyperlink(link),
             WriterInnerLock::Ansi(ref mut wtr) => wtr.set_hyperlink(link),
-            #[cfg(windows)]
-            WriterInnerLock::Windows { .. } => Ok(()),
         }
     }
 
     fn reset(&mut self) -> io::Result<()> {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(ref mut wtr) => wtr.reset(),
             WriterInnerLock::Ansi(ref mut wtr) => wtr.reset(),
-            #[cfg(windows)]
-            WriterInnerLock::Windows { ref mut wtr, ref mut console } => {
-                wtr.flush()?;
-                console.reset()?;
-                Ok(())
-            }
         }
     }
 
     fn is_synchronous(&self) -> bool {
         match *self {
-            WriterInnerLock::Unreachable(_) => unreachable!(),
             WriterInnerLock::NoColor(_) => false,
             WriterInnerLock::Ansi(_) => false,
-            #[cfg(windows)]
-            WriterInnerLock::Windows { .. } => true,
         }
     }
 }
@@ -975,8 +783,7 @@ impl<W: io::Write> WriteColor for WriterInnerLock<'_, W> {
 ///
 /// Writable buffers can be obtained by calling `buffer` on a `BufferWriter`.
 ///
-/// This writer works with terminals that support ANSI escape sequences or
-/// with a Windows console.
+/// This writer works with terminals that support ANSI escape sequences.
 ///
 /// It is intended for a `BufferWriter` to be put in an `Arc` and written to
 /// from multiple threads simultaneously.
@@ -986,8 +793,6 @@ pub struct BufferWriter {
     printed: AtomicBool,
     separator: Option<Vec<u8>>,
     color_choice: ColorChoice,
-    #[cfg(windows)]
-    console: Option<Mutex<wincon::Console>>,
 }
 
 impl BufferWriter {
@@ -996,7 +801,6 @@ impl BufferWriter {
     ///
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
-    #[cfg(not(windows))]
     fn create(sty: StandardStreamType, choice: ColorChoice) -> Self {
         Self {
             stream: LossyStandardStream::new(IoStandardStream::new(sty)),
@@ -1006,47 +810,8 @@ impl BufferWriter {
         }
     }
 
-    /// Create a new `BufferWriter` that writes to a standard stream with the
-    /// given color preferences.
-    ///
-    /// If coloring is desired and a Windows console could not be found, then
-    /// ANSI escape sequences are used instead.
-    ///
-    /// The specific color/style settings can be configured when writing to
-    /// the buffers themselves.
-    #[cfg(windows)]
-    fn create(sty: StandardStreamType, choice: ColorChoice) -> BufferWriter {
-        let mut con = match sty {
-            StandardStreamType::Stdout => wincon::Console::stdout(),
-            StandardStreamType::Stderr => wincon::Console::stderr(),
-            StandardStreamType::StdoutBuffered => wincon::Console::stdout(),
-            StandardStreamType::StderrBuffered => wincon::Console::stderr(),
-        }
-        .ok();
-        let is_console_virtual = con
-            .as_mut()
-            .map(|con| con.set_virtual_terminal_processing(true).is_ok())
-            .unwrap_or(false);
-        // If we can enable ANSI on Windows, then we don't need the console
-        // anymore.
-        if is_console_virtual {
-            con = None;
-        }
-        let stream = LossyStandardStream::new(IoStandardStream::new(sty));
-        BufferWriter {
-            stream,
-            printed: AtomicBool::new(false),
-            separator: None,
-            color_choice: choice,
-            console: con.map(Mutex::new),
-        }
-    }
-
     /// Create a new `BufferWriter` that writes to stdout with the given
     /// color preferences.
-    ///
-    /// On Windows, if coloring is desired and a Windows console could not be
-    /// found, then ANSI escape sequences are used instead.
     ///
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
@@ -1056,9 +821,6 @@ impl BufferWriter {
 
     /// Create a new `BufferWriter` that writes to stderr with the given
     /// color preferences.
-    ///
-    /// On Windows, if coloring is desired and a Windows console could not be
-    /// found, then ANSI escape sequences are used instead.
     ///
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
@@ -1078,18 +840,8 @@ impl BufferWriter {
     ///
     /// A `Buffer` satisfies both `io::Write` and `WriteColor`. A `Buffer` can
     /// be printed using the `print` method.
-    #[cfg(not(windows))]
     pub fn buffer(&self) -> Buffer {
         Buffer::new(self.color_choice)
-    }
-
-    /// Creates a new `Buffer` with the current color preferences.
-    ///
-    /// A `Buffer` satisfies both `io::Write` and `WriteColor`. A `Buffer` can
-    /// be printed using the `print` method.
-    #[cfg(windows)]
-    pub fn buffer(&self) -> Buffer {
-        Buffer::new(self.color_choice, self.console.is_some())
     }
 
     /// Prints the contents of the given buffer.
@@ -1111,17 +863,6 @@ impl BufferWriter {
         match buf.0 {
             BufferInner::NoColor(ref b) => stream.write_all(&b.0)?,
             BufferInner::Ansi(ref b) => stream.write_all(&b.0)?,
-            #[cfg(windows)]
-            BufferInner::Windows(ref b) => {
-                // We guarantee by construction that we have a console here.
-                // Namely, a BufferWriter is the only way to produce a Buffer.
-                let console_mutex = self
-                    .console
-                    .as_ref()
-                    .expect("got Windows buffer but have no Console");
-                let mut console = console_mutex.lock().unwrap();
-                b.print(&mut *console, &mut stream)?;
-            }
         }
         self.printed.store(true, Ordering::Relaxed);
         Ok(())
@@ -1132,13 +873,11 @@ impl BufferWriter {
 ///
 /// `Buffer` is a platform independent abstraction for printing colored text to
 /// an in memory buffer. When the buffer is printed using a `BufferWriter`, the
-/// color information will be applied to the output device (a tty on Unix and a
-/// console on Windows).
+/// color information will be applied to the output device.
 ///
-/// A `Buffer` is typically created by calling the `BufferWriter.buffer`
-/// method, which will take color preferences and the environment into
-/// account. However, buffers can also be manually created using `no_color`,
-/// `ansi` or `console` (on Windows).
+/// A `Buffer` is typically created by calling the `BufferWriter.buffer` method,
+/// which will take color preferences and the environment into account. However,
+/// buffers can also be manually created using `no_color` or `ansi`.
 #[derive(Clone, Debug)]
 pub struct Buffer(BufferInner);
 
@@ -1150,41 +889,15 @@ enum BufferInner {
     NoColor(NoColor<Vec<u8>>),
     /// Apply coloring using ANSI escape sequences embedded into the buffer.
     Ansi(Ansi<Vec<u8>>),
-    /// Apply coloring using the Windows console APIs. This buffer saves
-    /// color information in memory and only interacts with the console when
-    /// the buffer is printed.
-    #[cfg(windows)]
-    Windows(WindowsBuffer),
 }
 
 impl Buffer {
     /// Create a new buffer with the given color settings.
-    #[cfg(not(windows))]
     fn new(choice: ColorChoice) -> Self {
         if choice.should_attempt_color() {
             Self::ansi()
         } else {
             Self::no_color()
-        }
-    }
-
-    /// Create a new buffer with the given color settings.
-    ///
-    /// On Windows, one can elect to create a buffer capable of being written
-    /// to a console. Only enable it if a console is available.
-    ///
-    /// If coloring is desired and `console` is false, then ANSI escape
-    /// sequences are used instead.
-    #[cfg(windows)]
-    fn new(choice: ColorChoice, console: bool) -> Buffer {
-        if choice.should_attempt_color() {
-            if !console || choice.should_ansi() {
-                Buffer::ansi()
-            } else {
-                Buffer::console()
-            }
-        } else {
-            Buffer::no_color()
         }
     }
 
@@ -1198,12 +911,6 @@ impl Buffer {
         Self(BufferInner::Ansi(Ansi(vec![])))
     }
 
-    /// Create a buffer that can be written to a Windows console.
-    #[cfg(windows)]
-    pub fn console() -> Buffer {
-        Buffer(BufferInner::Windows(WindowsBuffer::new()))
-    }
-
     /// Returns true if and only if this buffer is empty.
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
@@ -1214,8 +921,6 @@ impl Buffer {
         match self.0 {
             BufferInner::NoColor(ref b) => b.0.len(),
             BufferInner::Ansi(ref b) => b.0.len(),
-            #[cfg(windows)]
-            BufferInner::Windows(ref b) => b.buf.len(),
         }
     }
 
@@ -1224,21 +929,14 @@ impl Buffer {
         match self.0 {
             BufferInner::NoColor(ref mut b) => b.0.clear(),
             BufferInner::Ansi(ref mut b) => b.0.clear(),
-            #[cfg(windows)]
-            BufferInner::Windows(ref mut b) => b.clear(),
         }
     }
 
     /// Consume this buffer and return the underlying raw data.
-    ///
-    /// On Windows, this unrecoverably drops all color information associated
-    /// with the buffer.
     pub fn into_inner(self) -> Vec<u8> {
         match self.0 {
             BufferInner::NoColor(b) => b.0,
             BufferInner::Ansi(b) => b.0,
-            #[cfg(windows)]
-            BufferInner::Windows(b) => b.buf,
         }
     }
 
@@ -1247,8 +945,6 @@ impl Buffer {
         match self.0 {
             BufferInner::NoColor(ref b) => &b.0,
             BufferInner::Ansi(ref b) => &b.0,
-            #[cfg(windows)]
-            BufferInner::Windows(ref b) => &b.buf,
         }
     }
 
@@ -1257,8 +953,6 @@ impl Buffer {
         match self.0 {
             BufferInner::NoColor(ref mut b) => &mut b.0,
             BufferInner::Ansi(ref mut b) => &mut b.0,
-            #[cfg(windows)]
-            BufferInner::Windows(ref mut b) => &mut b.buf,
         }
     }
 }
@@ -1269,8 +963,6 @@ impl io::Write for Buffer {
         match self.0 {
             BufferInner::NoColor(ref mut w) => w.write(buf),
             BufferInner::Ansi(ref mut w) => w.write(buf),
-            #[cfg(windows)]
-            BufferInner::Windows(ref mut w) => w.write(buf),
         }
     }
 
@@ -1279,8 +971,6 @@ impl io::Write for Buffer {
         match self.0 {
             BufferInner::NoColor(ref mut w) => w.flush(),
             BufferInner::Ansi(ref mut w) => w.flush(),
-            #[cfg(windows)]
-            BufferInner::Windows(ref mut w) => w.flush(),
         }
     }
 }
@@ -1291,8 +981,6 @@ impl WriteColor for Buffer {
         match self.0 {
             BufferInner::NoColor(_) => false,
             BufferInner::Ansi(_) => true,
-            #[cfg(windows)]
-            BufferInner::Windows(_) => true,
         }
     }
 
@@ -1301,8 +989,6 @@ impl WriteColor for Buffer {
         match self.0 {
             BufferInner::NoColor(_) => false,
             BufferInner::Ansi(_) => true,
-            #[cfg(windows)]
-            BufferInner::Windows(_) => false,
         }
     }
 
@@ -1311,8 +997,6 @@ impl WriteColor for Buffer {
         match self.0 {
             BufferInner::NoColor(ref mut w) => w.set_color(spec),
             BufferInner::Ansi(ref mut w) => w.set_color(spec),
-            #[cfg(windows)]
-            BufferInner::Windows(ref mut w) => w.set_color(spec),
         }
     }
 
@@ -1321,8 +1005,6 @@ impl WriteColor for Buffer {
         match self.0 {
             BufferInner::NoColor(ref mut w) => w.set_hyperlink(link),
             BufferInner::Ansi(ref mut w) => w.set_hyperlink(link),
-            #[cfg(windows)]
-            BufferInner::Windows(ref mut w) => w.set_hyperlink(link),
         }
     }
 
@@ -1331,8 +1013,6 @@ impl WriteColor for Buffer {
         match self.0 {
             BufferInner::NoColor(ref mut w) => w.reset(),
             BufferInner::Ansi(ref mut w) => w.reset(),
-            #[cfg(windows)]
-            BufferInner::Windows(ref mut w) => w.reset(),
         }
     }
 
@@ -1658,127 +1338,6 @@ impl WriteColor for io::Sink {
     }
 }
 
-/// An in-memory buffer that provides Windows console coloring.
-///
-/// This doesn't actually communicate with the Windows console. Instead, it
-/// acts like a normal buffer but also saves the color information associated
-/// with positions in the buffer. It is only when the buffer is written to the
-/// console that coloring is actually applied.
-///
-/// This is roughly isomorphic to the ANSI based approach (i.e.,
-/// `Ansi<Vec<u8>>`), except with ANSI, the color information is embedded
-/// directly into the buffer.
-///
-/// Note that there is no way to write something generic like
-/// `WindowsConsole<W: io::Write>` since coloring on Windows is tied
-/// specifically to the console APIs, and therefore can't work on arbitrary
-/// writers.
-#[cfg(windows)]
-#[derive(Clone, Debug)]
-struct WindowsBuffer {
-    /// The actual content that should be printed.
-    buf: Vec<u8>,
-    /// A sequence of position oriented color specifications. Namely, each
-    /// element is a position and a color spec, where the color spec should
-    /// be applied at the position inside of `buf`.
-    ///
-    /// A missing color spec implies the underlying console should be reset.
-    colors: Vec<(usize, Option<ColorSpec>)>,
-}
-
-#[cfg(windows)]
-impl WindowsBuffer {
-    /// Create a new empty buffer for Windows console coloring.
-    fn new() -> WindowsBuffer {
-        WindowsBuffer { buf: vec![], colors: vec![] }
-    }
-
-    /// Push the given color specification into this buffer.
-    ///
-    /// This has the effect of setting the given color information at the
-    /// current position in the buffer.
-    fn push(&mut self, spec: Option<ColorSpec>) {
-        let pos = self.buf.len();
-        self.colors.push((pos, spec));
-    }
-
-    /// Print the contents to the given stream handle, and use the console
-    /// for coloring.
-    fn print(
-        &self,
-        console: &mut wincon::Console,
-        stream: &mut LossyStandardStream<IoStandardStreamLock>,
-    ) -> io::Result<()> {
-        let mut last = 0;
-        for &(pos, ref spec) in &self.colors {
-            stream.write_all(&self.buf[last..pos])?;
-            stream.flush()?;
-            last = pos;
-            match *spec {
-                None => console.reset()?,
-                Some(ref spec) => spec.write_console(console)?,
-            }
-        }
-        stream.write_all(&self.buf[last..])?;
-        stream.flush()
-    }
-
-    /// Clear the buffer.
-    fn clear(&mut self) {
-        self.buf.clear();
-        self.colors.clear();
-    }
-}
-
-#[cfg(windows)]
-impl io::Write for WindowsBuffer {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.buf.extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-#[cfg(windows)]
-impl WriteColor for WindowsBuffer {
-    #[inline]
-    fn supports_color(&self) -> bool {
-        true
-    }
-
-    #[inline]
-    fn supports_hyperlinks(&self) -> bool {
-        false
-    }
-
-    #[inline]
-    fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        self.push(Some(spec.clone()));
-        Ok(())
-    }
-
-    #[inline]
-    fn set_hyperlink(&mut self, _: &HyperlinkSpec) -> io::Result<()> {
-        Ok(())
-    }
-
-    #[inline]
-    fn reset(&mut self) -> io::Result<()> {
-        self.push(None);
-        Ok(())
-    }
-
-    #[inline]
-    fn is_synchronous(&self) -> bool {
-        false
-    }
-}
-
 /// A color specification.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ColorSpec {
@@ -1838,75 +1397,55 @@ impl ColorSpec {
     }
 
     /// Get whether this is bold or not.
-    ///
-    /// Note that the bold setting has no effect in a Windows console.
     pub const fn bold(&self) -> bool {
         self.bold
     }
 
     /// Set whether the text is bolded or not.
-    ///
-    /// Note that the bold setting has no effect in a Windows console.
     pub const fn set_bold(&mut self, yes: bool) -> &mut Self {
         self.bold = yes;
         self
     }
 
     /// Get whether this is dimmed or not.
-    ///
-    /// Note that the dimmed setting has no effect in a Windows console.
     pub const fn dimmed(&self) -> bool {
         self.dimmed
     }
 
     /// Set whether the text is dimmed or not.
-    ///
-    /// Note that the dimmed setting has no effect in a Windows console.
     pub const fn set_dimmed(&mut self, yes: bool) -> &mut Self {
         self.dimmed = yes;
         self
     }
 
     /// Get whether this is italic or not.
-    ///
-    /// Note that the italic setting has no effect in a Windows console.
     pub const fn italic(&self) -> bool {
         self.italic
     }
 
     /// Set whether the text is italicized or not.
-    ///
-    /// Note that the italic setting has no effect in a Windows console.
     pub const fn set_italic(&mut self, yes: bool) -> &mut Self {
         self.italic = yes;
         self
     }
 
     /// Get whether this is underline or not.
-    ///
-    /// Note that the underline setting has no effect in a Windows console.
     pub const fn underline(&self) -> bool {
         self.underline
     }
 
     /// Set whether the text is underlined or not.
-    ///
-    /// Note that the underline setting has no effect in a Windows console.
     pub const fn set_underline(&mut self, yes: bool) -> &mut Self {
         self.underline = yes;
         self
     }
 
     /// Get whether this is strikethrough or not.
-    ///
-    /// Note that the strikethrough setting has no effect in a Windows console.
     pub const fn strikethrough(&self) -> bool {
         self.strikethrough
     }
 
     /// Set whether the text is strikethrough or not.
-    ///
-    /// Note that the strikethrough setting has no effect in a Windows console.
     pub const fn set_strikethrough(&mut self, yes: bool) -> &mut Self {
         self.strikethrough = yes;
         self
@@ -1917,8 +1456,6 @@ impl ColorSpec {
     /// reset is enabled by default. When disabled and using ANSI escape
     /// sequences, a "reset" code will be emitted every time a `ColorSpec`'s
     /// settings are applied.
-    ///
-    /// Note that the reset setting has no effect in a Windows console.
     pub const fn reset(&self) -> bool {
         self.reset
     }
@@ -1932,33 +1469,17 @@ impl ColorSpec {
     /// Typically this is useful if callers have a requirement to more
     /// scrupulously manage the exact sequence of escape codes that are emitted
     /// when using ANSI for colors.
-    ///
-    /// Note that the reset setting has no effect in a Windows console.
     pub const fn set_reset(&mut self, yes: bool) -> &mut Self {
         self.reset = yes;
         self
     }
 
     /// Get whether this is intense or not.
-    ///
-    /// On Unix-like systems, this will output the ANSI escape sequence
-    /// that will print a high-intensity version of the color
-    /// specified.
-    ///
-    /// On Windows systems, this will output the ANSI escape sequence
-    /// that will print a brighter version of the color specified.
     pub const fn intense(&self) -> bool {
         self.intense
     }
 
     /// Set whether the text is intense or not.
-    ///
-    /// On Unix-like systems, this will output the ANSI escape sequence
-    /// that will print a high-intensity version of the color
-    /// specified.
-    ///
-    /// On Windows systems, this will output the ANSI escape sequence
-    /// that will print a brighter version of the color specified.
     pub const fn set_intense(&mut self, yes: bool) -> &mut Self {
         self.intense = yes;
         self
@@ -1987,30 +1508,12 @@ impl ColorSpec {
         self.italic = false;
         self.strikethrough = false;
     }
-
-    /// Writes this color spec to the given Windows console.
-    #[cfg(windows)]
-    fn write_console(&self, console: &mut wincon::Console) -> io::Result<()> {
-        let fg_color = self.fg_color.and_then(|c| c.to_windows(self.intense));
-        if let Some((intense, color)) = fg_color {
-            console.fg(intense, color)?;
-        }
-        let bg_color = self.bg_color.and_then(|c| c.to_windows(self.intense));
-        if let Some((intense, color)) = bg_color {
-            console.bg(intense, color)?;
-        }
-        Ok(())
-    }
 }
 
 /// The set of available colors for the terminal foreground/background.
 ///
 /// The `Ansi256` and `Rgb` colors will only output the correct codes when
 /// paired with the `Ansi` `WriteColor` implementation.
-///
-/// The `Ansi256` and `Rgb` color types are not supported when writing colors
-/// on Windows using the console. If they are used on Windows, then they are
-/// silently ignored and no colors will be emitted.
 ///
 /// This set may expand over time.
 ///
@@ -2041,47 +1544,6 @@ pub enum Color {
 }
 
 impl Color {
-    /// Translate this color to a wincon::Color.
-    #[cfg(windows)]
-    fn to_windows(
-        self,
-        intense: bool,
-    ) -> Option<(wincon::Intense, wincon::Color)> {
-        use wincon::Intense::{No, Yes};
-
-        let color = match self {
-            Color::Black => wincon::Color::Black,
-            Color::Blue => wincon::Color::Blue,
-            Color::Green => wincon::Color::Green,
-            Color::Red => wincon::Color::Red,
-            Color::Cyan => wincon::Color::Cyan,
-            Color::Magenta => wincon::Color::Magenta,
-            Color::Yellow => wincon::Color::Yellow,
-            Color::White => wincon::Color::White,
-            Color::Ansi256(0) => return Some((No, wincon::Color::Black)),
-            Color::Ansi256(1) => return Some((No, wincon::Color::Red)),
-            Color::Ansi256(2) => return Some((No, wincon::Color::Green)),
-            Color::Ansi256(3) => return Some((No, wincon::Color::Yellow)),
-            Color::Ansi256(4) => return Some((No, wincon::Color::Blue)),
-            Color::Ansi256(5) => return Some((No, wincon::Color::Magenta)),
-            Color::Ansi256(6) => return Some((No, wincon::Color::Cyan)),
-            Color::Ansi256(7) => return Some((No, wincon::Color::White)),
-            Color::Ansi256(8) => return Some((Yes, wincon::Color::Black)),
-            Color::Ansi256(9) => return Some((Yes, wincon::Color::Red)),
-            Color::Ansi256(10) => return Some((Yes, wincon::Color::Green)),
-            Color::Ansi256(11) => return Some((Yes, wincon::Color::Yellow)),
-            Color::Ansi256(12) => return Some((Yes, wincon::Color::Blue)),
-            Color::Ansi256(13) => return Some((Yes, wincon::Color::Magenta)),
-            Color::Ansi256(14) => return Some((Yes, wincon::Color::Cyan)),
-            Color::Ansi256(15) => return Some((Yes, wincon::Color::White)),
-            Color::Ansi256(_) => return None,
-            Color::Rgb(_, _, _) => return None,
-            Color::__Nonexhaustive => unreachable!(),
-        };
-        let intense = if intense { Yes } else { No };
-        Some((intense, color))
-    }
-
     /// Parses a numeric color string, either ANSI or RGB.
     fn from_str_numeric(s: &str) -> Result<Self, ParseColorError> {
         // The "ansi256" format is a single number (decimal or hex)
@@ -2241,32 +1703,16 @@ impl<'a> HyperlinkSpec<'a> {
 #[derive(Debug)]
 struct LossyStandardStream<W> {
     wtr: W,
-    #[cfg(windows)]
-    is_console: bool,
 }
 
 impl<W: io::Write> LossyStandardStream<W> {
-    #[cfg(not(windows))]
     const fn new(wtr: W) -> Self {
         Self { wtr }
     }
 
-    #[cfg(windows)]
-    fn new(wtr: W) -> LossyStandardStream<W> {
-        let is_console = wincon::Console::stdout().is_ok()
-            || wincon::Console::stderr().is_ok();
-        LossyStandardStream { wtr, is_console }
-    }
-
-    #[cfg(not(windows))]
     const fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
         _ = self;
         LossyStandardStream::new(wtr)
-    }
-
-    #[cfg(windows)]
-    const fn wrap<Q: io::Write>(&self, wtr: Q) -> LossyStandardStream<Q> {
-        LossyStandardStream { wtr, is_console: self.is_console }
     }
 
     const fn get_ref(&self) -> &W {
@@ -2296,34 +1742,12 @@ impl<W: WriteColor> WriteColor for LossyStandardStream<W> {
 }
 
 impl<W: io::Write> io::Write for LossyStandardStream<W> {
-    #[cfg(not(windows))]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.wtr.write(buf)
     }
 
-    #[cfg(windows)]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if self.is_console {
-            write_lossy_utf8(&mut self.wtr, buf)
-        } else {
-            self.wtr.write(buf)
-        }
-    }
-
     fn flush(&mut self) -> io::Result<()> {
         self.wtr.flush()
-    }
-}
-
-#[cfg(windows)]
-fn write_lossy_utf8<W: io::Write>(mut w: W, buf: &[u8]) -> io::Result<usize> {
-    match ::std::str::from_utf8(buf) {
-        Ok(s) => w.write(s.as_bytes()),
-        Err(ref e) if e.valid_up_to() == 0 => {
-            w.write(b"\xEF\xBF\xBD")?;
-            Ok(1)
-        }
-        Err(e) => w.write(&buf[..e.valid_up_to()]),
     }
 }
 
