@@ -774,7 +774,7 @@ impl BufferWriter {
     ///
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
-    fn create(stream: IoStandardStream, choice: ColorChoice) -> Self {
+    const fn create(stream: IoStandardStream, choice: ColorChoice) -> Self {
         Self {
             stream,
             printed: AtomicBool::new(false),
