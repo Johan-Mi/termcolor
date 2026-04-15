@@ -378,9 +378,9 @@ impl fmt::Display for ColorChoiceParseError {
     }
 }
 
-/// `std::io` implements `Stdout` and `Stderr` (and their `Lock` variants) as
-/// separate types, which makes it difficult to abstract over them. We use
-/// some simple internal enum types to work around this.
+// `std::io` implements `Stdout` and `Stderr` (and their `Lock` variants) as
+// separate types, which makes it difficult to abstract over them. We use
+// some simple internal enum types to work around this.
 
 enum StandardStreamType {
     Stdout,
@@ -1142,11 +1142,11 @@ impl BufferWriter {
             return Ok(());
         }
         let mut stream = self.stream.wrap(self.stream.get_ref().lock());
-        if let Some(ref sep) = self.separator {
-            if self.printed.load(Ordering::Relaxed) {
-                stream.write_all(sep)?;
-                stream.write_all(b"\n")?;
-            }
+        if let Some(ref sep) = self.separator
+            && self.printed.load(Ordering::Relaxed)
+        {
+            stream.write_all(sep)?;
+            stream.write_all(b"\n")?;
         }
         match buf.0 {
             BufferInner::NoColor(ref b) => stream.write_all(&b.0)?,
@@ -1658,7 +1658,6 @@ impl<W: io::Write> Ansi<W> {
                 Color::White => write_intense!("15"),
                 Color::Ansi256(c) => write_custom!(c),
                 Color::Rgb(r, g, b) => write_custom!(r, g, b),
-                Color::__Nonexhaustive => unreachable!(),
             }
         } else {
             match *c {
@@ -1672,7 +1671,6 @@ impl<W: io::Write> Ansi<W> {
                 Color::White => write_normal!("7"),
                 Color::Ansi256(c) => write_custom!(c),
                 Color::Rgb(r, g, b) => write_custom!(r, g, b),
-                Color::__Nonexhaustive => unreachable!(),
             }
         }
     }
@@ -2068,6 +2066,7 @@ impl ColorSpec {
 /// Hexadecimal numbers are written with a `0x` prefix.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Color {
     Black,
     Blue,
@@ -2079,8 +2078,6 @@ pub enum Color {
     White,
     Ansi256(u8),
     Rgb(u8, u8, u8),
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 impl Color {
@@ -2134,12 +2131,10 @@ impl Color {
         // by a comma corresponding to one of 256^3 colors.
 
         fn parse_number(s: &str) -> Option<u8> {
-            use std::u8;
-
-            if s.starts_with("0x") {
-                u8::from_str_radix(&s[2..], 16).ok()
+            if let Some(s) = s.strip_prefix("0x") {
+                u8::from_str_radix(s, 16).ok()
             } else {
-                u8::from_str_radix(s, 10).ok()
+                s.parse::<u8>().ok()
             }
         }
 
@@ -2503,14 +2498,14 @@ mod tests {
 
     fn all_attributes() -> Vec<ColorSpec> {
         let mut result = vec![];
-        for fg in vec![None, Some(Color::Red)] {
-            for bg in vec![None, Some(Color::Red)] {
-                for bold in vec![false, true] {
-                    for underline in vec![false, true] {
-                        for intense in vec![false, true] {
-                            for italic in vec![false, true] {
-                                for strikethrough in vec![false, true] {
-                                    for dimmed in vec![false, true] {
+        for fg in [None, Some(Color::Red)] {
+            for bg in [None, Some(Color::Red)] {
+                for bold in [false, true] {
+                    for underline in [false, true] {
+                        for intense in [false, true] {
+                            for italic in [false, true] {
+                                for strikethrough in [false, true] {
+                                    for dimmed in [false, true] {
                                         let mut color = ColorSpec::new();
                                         color.set_fg(fg);
                                         color.set_bg(bg);
