@@ -299,14 +299,6 @@ impl fmt::Display for ColorChoiceParseError {
 // separate types, which makes it difficult to abstract over them. We use
 // some simple internal enum types to work around this.
 
-#[derive(Clone, Copy)]
-enum StandardStreamType {
-    Stdout,
-    Stderr,
-    StdoutBuffered,
-    StderrBuffered,
-}
-
 #[derive(Debug)]
 enum IoStandardStream {
     Stdout(io::Stdout),
@@ -316,21 +308,6 @@ enum IoStandardStream {
 }
 
 impl IoStandardStream {
-    fn new(sty: StandardStreamType) -> Self {
-        match sty {
-            StandardStreamType::Stdout => Self::Stdout(io::stdout()),
-            StandardStreamType::Stderr => Self::Stderr(io::stderr()),
-            StandardStreamType::StdoutBuffered => {
-                let wtr = io::BufWriter::new(io::stdout());
-                Self::StdoutBuffered(wtr)
-            }
-            StandardStreamType::StderrBuffered => {
-                let wtr = io::BufWriter::new(io::stderr());
-                Self::StderrBuffered(wtr)
-            }
-        }
-    }
-
     fn lock(&self) -> IoStandardStreamLock<'_> {
         match self {
             Self::Stdout(s) => IoStandardStreamLock::StdoutLock(s.lock()),
@@ -440,7 +417,10 @@ impl StandardStream {
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
     pub fn stdout(choice: ColorChoice) -> Self {
-        let wtr = WriterInner::create(StandardStreamType::Stdout, choice);
+        let wtr = WriterInner::create(
+            IoStandardStream::Stdout(io::stdout()),
+            choice,
+        );
         Self { wtr }
     }
 
@@ -450,7 +430,10 @@ impl StandardStream {
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
     pub fn stderr(choice: ColorChoice) -> Self {
-        let wtr = WriterInner::create(StandardStreamType::Stderr, choice);
+        let wtr = WriterInner::create(
+            IoStandardStream::Stderr(io::stderr()),
+            choice,
+        );
         Self { wtr }
     }
 
@@ -485,8 +468,10 @@ impl BufferedStandardStream {
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
     pub fn stdout(choice: ColorChoice) -> Self {
-        let wtr =
-            WriterInner::create(StandardStreamType::StdoutBuffered, choice);
+        let wtr = WriterInner::create(
+            IoStandardStream::StdoutBuffered(io::BufWriter::new(io::stdout())),
+            choice,
+        );
         Self { wtr }
     }
 
@@ -496,8 +481,10 @@ impl BufferedStandardStream {
     /// The specific color/style settings can be configured when writing via
     /// the `WriteColor` trait.
     pub fn stderr(choice: ColorChoice) -> Self {
-        let wtr =
-            WriterInner::create(StandardStreamType::StderrBuffered, choice);
+        let wtr = WriterInner::create(
+            IoStandardStream::StderrBuffered(io::BufWriter::new(io::stderr())),
+            choice,
+        );
         Self { wtr }
     }
 }
@@ -505,11 +492,11 @@ impl BufferedStandardStream {
 impl WriterInner<IoStandardStream> {
     /// Create a new inner writer for a standard stream with the given color
     /// preferences.
-    fn create(sty: StandardStreamType, choice: ColorChoice) -> Self {
+    fn create(stream: IoStandardStream, choice: ColorChoice) -> Self {
         if choice.should_attempt_color() {
-            Self::Ansi(Ansi(IoStandardStream::new(sty)))
+            Self::Ansi(Ansi(stream))
         } else {
-            Self::NoColor(NoColor(IoStandardStream::new(sty)))
+            Self::NoColor(NoColor(stream))
         }
     }
 }
@@ -790,9 +777,9 @@ impl BufferWriter {
     ///
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
-    fn create(sty: StandardStreamType, choice: ColorChoice) -> Self {
+    fn create(stream: IoStandardStream, choice: ColorChoice) -> Self {
         Self {
-            stream: IoStandardStream::new(sty),
+            stream,
             printed: AtomicBool::new(false),
             separator: None,
             color_choice: choice,
@@ -805,7 +792,7 @@ impl BufferWriter {
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
     pub fn stdout(choice: ColorChoice) -> Self {
-        Self::create(StandardStreamType::Stdout, choice)
+        Self::create(IoStandardStream::Stdout(io::stdout()), choice)
     }
 
     /// Create a new `BufferWriter` that writes to stderr with the given
@@ -814,7 +801,7 @@ impl BufferWriter {
     /// The specific color/style settings can be configured when writing to
     /// the buffers themselves.
     pub fn stderr(choice: ColorChoice) -> Self {
-        Self::create(StandardStreamType::Stderr, choice)
+        Self::create(IoStandardStream::Stderr(io::stderr()), choice)
     }
 
     /// If set, the separator given is printed between buffers. By default, no
