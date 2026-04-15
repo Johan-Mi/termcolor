@@ -355,16 +355,16 @@ impl io::Write for IoStandardStreamLock {
     #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         match self {
-            IoStandardStreamLock::StdoutLock(s) => s.write(b),
-            IoStandardStreamLock::StderrLock(s) => s.write(b),
+            Self::StdoutLock(s) => s.write(b),
+            Self::StderrLock(s) => s.write(b),
         }
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            IoStandardStreamLock::StdoutLock(s) => s.flush(),
-            IoStandardStreamLock::StderrLock(s) => s.flush(),
+            Self::StdoutLock(s) => s.flush(),
+            Self::StderrLock(s) => s.flush(),
         }
     }
 }
