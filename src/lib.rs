@@ -396,7 +396,7 @@ impl io::Write for IoStandardStreamLock<'_> {
 /// to either of the standard output streams, stdout and stderr.
 #[derive(Debug)]
 pub struct StandardStream {
-    wtr: LossyStandardStream<WriterInner<IoStandardStream>>,
+    wtr: WriterInner<IoStandardStream>,
 }
 
 /// `StandardStreamLock` is a locked reference to a `StandardStream`.
@@ -408,13 +408,13 @@ pub struct StandardStream {
 /// `StandardStream`.
 #[derive(Debug)]
 pub struct StandardStreamLock<'a> {
-    wtr: LossyStandardStream<WriterInnerLock<IoStandardStreamLock<'a>>>,
+    wtr: WriterInnerLock<IoStandardStreamLock<'a>>,
 }
 
 /// Like `StandardStream`, but does buffered writing.
 #[derive(Debug)]
 pub struct BufferedStandardStream {
-    wtr: LossyStandardStream<WriterInner<IoStandardStream>>,
+    wtr: WriterInner<IoStandardStream>,
 }
 
 /// `WriterInner` is a (limited) generic representation of a writer. It is
@@ -441,7 +441,7 @@ impl StandardStream {
     /// the `WriteColor` trait.
     pub fn stdout(choice: ColorChoice) -> Self {
         let wtr = WriterInner::create(StandardStreamType::Stdout, choice);
-        Self { wtr: LossyStandardStream::new(wtr) }
+        Self { wtr }
     }
 
     /// Create a new `StandardStream` with the given color preferences that
@@ -451,7 +451,7 @@ impl StandardStream {
     /// the `WriteColor` trait.
     pub fn stderr(choice: ColorChoice) -> Self {
         let wtr = WriterInner::create(StandardStreamType::Stderr, choice);
-        Self { wtr: LossyStandardStream::new(wtr) }
+        Self { wtr }
     }
 
     /// Lock the underlying writer.
@@ -468,13 +468,13 @@ impl StandardStream {
 
 impl StandardStreamLock<'_> {
     fn from_stream(stream: &StandardStream) -> StandardStreamLock<'_> {
-        let locked = match stream.wtr.get_ref() {
+        let locked = match &stream.wtr {
             WriterInner::NoColor(w) => {
                 WriterInnerLock::NoColor(NoColor(w.0.lock()))
             }
             WriterInner::Ansi(w) => WriterInnerLock::Ansi(Ansi(w.0.lock())),
         };
-        StandardStreamLock { wtr: LossyStandardStream::new(locked) }
+        StandardStreamLock { wtr: locked }
     }
 }
 
@@ -487,7 +487,7 @@ impl BufferedStandardStream {
     pub fn stdout(choice: ColorChoice) -> Self {
         let wtr =
             WriterInner::create(StandardStreamType::StdoutBuffered, choice);
-        Self { wtr: LossyStandardStream::new(wtr) }
+        Self { wtr }
     }
 
     /// Create a new `BufferedStandardStream` with the given color preferences
@@ -498,7 +498,7 @@ impl BufferedStandardStream {
     pub fn stderr(choice: ColorChoice) -> Self {
         let wtr =
             WriterInner::create(StandardStreamType::StderrBuffered, choice);
-        Self { wtr: LossyStandardStream::new(wtr) }
+        Self { wtr }
     }
 }
 
@@ -778,7 +778,7 @@ impl<W: io::Write> WriteColor for WriterInnerLock<W> {
 /// from multiple threads simultaneously.
 #[derive(Debug)]
 pub struct BufferWriter {
-    stream: LossyStandardStream<IoStandardStream>,
+    stream: IoStandardStream,
     printed: AtomicBool,
     separator: Option<Vec<u8>>,
     color_choice: ColorChoice,
@@ -792,7 +792,7 @@ impl BufferWriter {
     /// the buffers themselves.
     fn create(sty: StandardStreamType, choice: ColorChoice) -> Self {
         Self {
-            stream: LossyStandardStream::new(IoStandardStream::new(sty)),
+            stream: IoStandardStream::new(sty),
             printed: AtomicBool::new(false),
             separator: None,
             color_choice: choice,
@@ -842,8 +842,7 @@ impl BufferWriter {
         if buf.is_empty() {
             return Ok(());
         }
-        let mut stream =
-            LossyStandardStream::new(self.stream.get_ref().lock());
+        let mut stream = self.stream.lock();
         if let Some(sep) = &self.separator
             && self.printed.load(Ordering::Relaxed)
         {
@@ -1687,52 +1686,6 @@ impl<'a> HyperlinkSpec<'a> {
     /// Returns the URI of the hyperlink if one is attached to this spec.
     pub const fn uri(&self) -> Option<&'a [u8]> {
         self.uri
-    }
-}
-
-#[derive(Debug)]
-struct LossyStandardStream<W> {
-    wtr: W,
-}
-
-impl<W: io::Write> LossyStandardStream<W> {
-    const fn new(wtr: W) -> Self {
-        Self { wtr }
-    }
-
-    const fn get_ref(&self) -> &W {
-        &self.wtr
-    }
-}
-
-impl<W: WriteColor> WriteColor for LossyStandardStream<W> {
-    fn supports_color(&self) -> bool {
-        self.wtr.supports_color()
-    }
-    fn supports_hyperlinks(&self) -> bool {
-        self.wtr.supports_hyperlinks()
-    }
-    fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        self.wtr.set_color(spec)
-    }
-    fn set_hyperlink(&mut self, link: &HyperlinkSpec) -> io::Result<()> {
-        self.wtr.set_hyperlink(link)
-    }
-    fn reset(&mut self) -> io::Result<()> {
-        self.wtr.reset()
-    }
-    fn is_synchronous(&self) -> bool {
-        self.wtr.is_synchronous()
-    }
-}
-
-impl<W: io::Write> io::Write for LossyStandardStream<W> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.wtr.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.wtr.flush()
     }
 }
 
