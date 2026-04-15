@@ -308,7 +308,7 @@ enum IoStandardStream {
 }
 
 impl IoStandardStream {
-    fn lock(&self) -> IoStandardStreamLock<'_> {
+    fn lock(&self) -> IoStandardStreamLock {
         match self {
             Self::Stdout(s) => IoStandardStreamLock::StdoutLock(s.lock()),
             Self::Stderr(s) => IoStandardStreamLock::StderrLock(s.lock()),
@@ -346,12 +346,12 @@ impl io::Write for IoStandardStream {
 // Same rigmarole for the locked variants of the standard streams.
 
 #[derive(Debug)]
-enum IoStandardStreamLock<'a> {
-    StdoutLock(io::StdoutLock<'a>),
-    StderrLock(io::StderrLock<'a>),
+enum IoStandardStreamLock {
+    StdoutLock(io::StdoutLock<'static>),
+    StderrLock(io::StderrLock<'static>),
 }
 
-impl io::Write for IoStandardStreamLock<'_> {
+impl io::Write for IoStandardStreamLock {
     #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         match self {
@@ -380,12 +380,9 @@ pub struct StandardStream {
 ///
 /// This implements the `io::Write` and `WriteColor` traits, and is constructed
 /// via the `Write::lock` method.
-///
-/// The lifetime `'a` refers to the lifetime of the corresponding
-/// `StandardStream`.
 #[derive(Debug)]
-pub struct StandardStreamLock<'a> {
-    wtr: WriterInnerLock<IoStandardStreamLock<'a>>,
+pub struct StandardStreamLock {
+    wtr: WriterInnerLock<IoStandardStreamLock>,
 }
 
 /// Like `StandardStream`, but does buffered writing.
@@ -444,20 +441,20 @@ impl StandardStream {
     ///
     /// This method is **not reentrant**. It may panic if `lock` is called
     /// while a `StandardStreamLock` is still alive.
-    pub fn lock(&self) -> StandardStreamLock<'_> {
+    pub fn lock(&self) -> StandardStreamLock {
         StandardStreamLock::from_stream(self)
     }
 }
 
-impl StandardStreamLock<'_> {
-    fn from_stream(stream: &StandardStream) -> StandardStreamLock<'_> {
+impl StandardStreamLock {
+    fn from_stream(stream: &StandardStream) -> Self {
         let locked = match &stream.wtr {
             WriterInner::NoColor(w) => {
                 WriterInnerLock::NoColor(NoColor(w.0.lock()))
             }
             WriterInner::Ansi(w) => WriterInnerLock::Ansi(Ansi(w.0.lock())),
         };
-        StandardStreamLock { wtr: locked }
+        Self { wtr: locked }
     }
 }
 
@@ -545,7 +542,7 @@ impl WriteColor for StandardStream {
     }
 }
 
-impl io::Write for StandardStreamLock<'_> {
+impl io::Write for StandardStreamLock {
     #[inline]
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         self.wtr.write(b)
@@ -557,7 +554,7 @@ impl io::Write for StandardStreamLock<'_> {
     }
 }
 
-impl WriteColor for StandardStreamLock<'_> {
+impl WriteColor for StandardStreamLock {
     #[inline]
     fn supports_color(&self) -> bool {
         self.wtr.supports_color()
